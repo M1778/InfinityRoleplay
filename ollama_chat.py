@@ -506,9 +506,8 @@ const PRESETS = {
     user: "Pilot", userpersona: "A scavenger pilot looking for parts — or something more." }
 };
 const FIELDS = ["name","age","persona","hair","eyes","build","outfit","extra","vibe","scene","user","userpersona"];
-const HARD_BANS = ["minors", "non-consent", "incest", "real people", "self-harm erotica"];
-// Baseline character boundaries (prompt-level; the project's age policy lives in README.md).
-function BOUNDARIES(n) { return "Write only " + n + "'s words and actions. Lines starting with OOC: are player instruction — reply briefly in plain text, then resume. Keep attraction playful and non-explicit (fade to black; no graphic content). Never include: " + HARD_BANS.join(", ") + "."; }
+// Roleplay hygiene only (who speaks/acts); content policy lives in README.md.
+function BOUNDARIES(n) { return "Write only " + n + "'s words and actions. Lines starting with OOC: are player instruction — reply briefly in plain text, then resume."; }
 function readPersona() {
   const p = {};
   FIELDS.forEach((f) => { p[f] = $("p_" + f).value; });
@@ -826,16 +825,15 @@ document.querySelectorAll("[data-fix]").forEach((b) => {
 // ---------- scene images (hapuppy image model; sync on server) ----------
 function imagePrompt(extra) {
   const p = readPersona();
-  return "soft anime illustration of " + p.name + ", 18 years old, " + appearanceLine(p) + " " + (extra || p.scene) +
+  return "soft anime illustration of " + p.name + ", " + appearanceLine(p) + " " + (extra || p.scene) +
     ", " + $("imgstyle").value + ", detailed, warm lighting";
 }
-const NEG = "blurry, watermark, text, logo, deformed, low quality, photorealistic child, minor";
 async function requestImage(prompt, caption) {
   addMsg("sys", "🎨 painting the scene… (takes a bit, chat stays usable)");
   try {
     const [w, h] = selectedImgSize();
     const r = await fetch("/api/image", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: prompt + " ### " + NEG, width: w, height: h }) });
+      body: JSON.stringify({ prompt, width: w, height: h }) });
     const j = await r.json();
     if (j.error) throw new Error(j.error);
     pollImage(j.job, caption);
@@ -923,7 +921,7 @@ async function requestCompare(prompt, label, im, cap, btn) {
   try {
     const [w, h] = selectedImgSize();
     const r = await fetch("/api/image", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: prompt + " ### " + NEG, width: w, height: h }) });
+      body: JSON.stringify({ prompt, width: w, height: h }) });
     const j = await r.json();
     if (j.error) throw new Error(j.error);
     pollCompare(j.job, label, im, cap, btn);
@@ -1189,7 +1187,7 @@ $("ttspitch").oninput = () => { $("ttspitchval").textContent = $("ttspitch").val
 $("ttsauto").onchange = persist;
 
 // ---------- c.ai-style UI additions (additive; redefines nothing) ----------
-const AP_INSTRUCTION = "You are a character-creation assistant. The user will describe a roleplay character in one free-text prompt. Return ONLY a single JSON object, no other text, no markdown, no code fences, with EXACTLY these keys: {\"name\": string, \"age\": string, \"persona\": string (2-3 sentences: voice, values, flaw), \"hair\": string, \"eyes\": string, \"build\": string, \"outfit\": string, \"extra\": string, \"vibe\": string (1-2 sentences of plain prose describing the emotional dynamic: e.g. switch lean, warmth, boldness), \"scene\": string (2-3 sentences: where, when, who is present, the spark), \"user\": string (the user's name, default \"Traveler\"), \"userpersona\": string (1-2 sentences)}. Rules: every character is an adult aged 18 or older — if the description suggests a minor, age the character up to 18+ and note it in \"persona\"; if the user describes an adult dynamic, keep the adult framing; keep attraction playful and non-explicit; never leave a key empty, invent a sensible default instead; vibe must be prose, never numbers; scene must work as-is as an opening scene. User prompt:";
+const AP_INSTRUCTION = "You are a character-creation assistant. The user will describe a roleplay character in one free-text prompt. Return ONLY a single JSON object, no other text, no markdown, no code fences, with EXACTLY these keys: {\"name\": string, \"age\": string, \"persona\": string (2-3 sentences: voice, values, flaw), \"hair\": string, \"eyes\": string, \"build\": string, \"outfit\": string, \"extra\": string, \"vibe\": string (1-2 sentences of plain prose describing the emotional dynamic: e.g. switch lean, warmth, boldness), \"scene\": string (2-3 sentences: where, when, who is present, the spark), \"user\": string (the user's name, default \"Traveler\"), \"userpersona\": string (1-2 sentences)}. Rules: never leave a key empty, invent a sensible default instead; vibe must be prose, never numbers; scene must work as-is as an opening scene. User prompt:";
 function apParse(raw) {
   const out = {};
   const m = (raw || "").match(/\{[\s\S]*\}/);
