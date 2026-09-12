@@ -16,13 +16,15 @@ What v2 adds:
     for the 3 classic small-model failures.
   * Thinking-model support: `think` toggle, thought traces shown in a
     collapsible and stripped from history (models imitate fed-back traces).
-  * Scene images via AI Horde crowdsourced GPU (anonymous key, $0, no
-    signup): auto-generated per scene + on-demand illustrate + gallery.
+  * Scene images via hapuppy-hosted image model (default
+    gemini-3.1-flash-image): auto-generated per scene + on-demand
+    illustrate + compare variations + gallery. Needs HAPUPPY_KEY.
   * Tabbed UI (Chat / Persona / Direct / Gallery) + localStorage memory.
 
 Env: OLLAMA_HOST (default http://localhost:11434), CHAT_PORT (default 8777),
-     HORDE_KEY (default 0000000000 anonymous), HORDE_BASE
-     (default https://stablehorde.net/api/v2).
+     HAPUPPY_KEY (secret, required for images — put it in .env, never in git),
+     HAPUPPY_BASE (default https://beta.hapuppy.com/v1),
+     HAPUPPY_IMAGE_MODEL (default gemini-3.1-flash-image).
 Stdlib only. No dependencies.
 """
 
@@ -42,19 +44,20 @@ except Exception:
 
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 PORT = int(os.environ.get("CHAT_PORT", "8777"))
-HORDE = os.environ.get("HORDE_BASE", "https://stablehorde.net/api/v2").rstrip("/")
-HORDE_KEY = os.environ.get("HORDE_KEY", "0000000000")
-CLIENT_AGENT = "ollama-rp-chat/2.0"
+HAPUPPY_BASE = os.environ.get("HAPUPPY_BASE", "https://beta.hapuppy.com/v1").rstrip("/")
+HAPUPPY_KEY = os.environ.get("HAPUPPY_KEY", "")
+HAPUPPY_IMAGE_MODEL = os.environ.get("HAPUPPY_IMAGE_MODEL", "gemini-3.1-flash-image")
 
 JOBS = {}
 JOBS_LOCK = threading.Lock()
 
 
-def _clean_models(val):
-    """Validate optional Horde model override: list of <=3 names, else []."""
-    if not isinstance(val, list):
-        return []
-    return [m.strip() for m in val if isinstance(m, str) and m.strip()][:3]
+def _clamp_ctx(v):
+    """Clamp requested Ollama context window to a sane range (default 4k)."""
+    try:
+        return min(max(int(v), 1024), 131072)
+    except (TypeError, ValueError):
+        return 4096
 
 HTML = r"""<!DOCTYPE html>
 <html lang="en">
@@ -182,6 +185,86 @@ button.tiny { min-height: 44px; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 </style>
+<style>/* v4 ground-up theme: calm ink surfaces, violet primary + warm amber secondary, teal reserved for status */
+:root {
+  --bg: #0a0c11; --card: #12151d; --card2: #171b26; --line: rgba(255, 255, 255, .08);
+  --txt: #eceef4; --dim: #9aa2b5; --acc: #8b7cf6; --warm: #f0b46a; --ok: #45ddd0; --bad: #ff7a7a;
+  --r-lg: 20px; --r-md: 14px; --r-sm: 10px;
+}
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+::selection { background: rgba(139, 124, 246, .4); }
+body {
+  background:
+    radial-gradient(900px 380px at 12% -8%, rgba(240, 180, 106, .07) 0%, transparent 60%) fixed,
+    radial-gradient(1100px 480px at 88% -12%, rgba(139, 124, 246, .12) 0%, transparent 60%) fixed,
+    var(--bg);
+  max-width: 960px; color: var(--txt);
+}
+h1, .cai-welcome-title { text-wrap: balance; }
+.stats, #kudos, .gal figcaption { font-variant-numeric: tabular-nums; }
+/* hero */
+.cai-top { background: linear-gradient(180deg, var(--card2), var(--card)); box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
+.cai-avatar { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px color-mix(in srgb, var(--acc) 65%, transparent), 0 6px 18px rgba(0, 0, 0, .5); }
+#status { display: inline-flex; align-items: center; gap: 6px; }
+#status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: .9; }
+#status.ok { background: rgba(69, 221, 208, .14); color: var(--ok); }
+#status.bad { background: rgba(255, 122, 122, .14); color: var(--bad); }
+/* chat column */
+#tab-chat .cai-chatcard { background: transparent; border: none; padding: 0; }
+#chat { max-width: 680px; margin: 0 auto; width: 100%; }
+.msg { border: 1px solid var(--line); box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+       animation: msg-in .18s ease-out; }
+@keyframes msg-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.msg.you { background: linear-gradient(160deg, #22334d, #1a2740); border-color: rgba(140, 180, 255, .16); }
+.msg.ai { background: linear-gradient(160deg, #1e2230, #191d29); }
+.msg.sys { border-style: dashed; box-shadow: none; }
+.msg .dlg { color: var(--warm); }
+.msg .act { color: #c2cadb; }
+.msg details { border-top: 1px solid var(--line); padding-top: 4px; }
+.msg details summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+mark { background: rgba(240, 180, 106, .35); color: #fff; border-radius: 4px; padding: 0 2px; }
+/* composer */
+.card.composer { background: linear-gradient(180deg, var(--card2), var(--card)); border-radius: 24px; }
+#send { min-height: 54px; padding: 10px 26px; font-size: 1.05rem;
+        transition-property: transform, filter; transition-duration: 150ms; transition-timing-function: ease-out; }
+#send:hover:not(:disabled) { filter: brightness(1.1); }
+#send:active:not(:disabled) { transform: scale(.96); }
+button.secondary { transition-property: background-color, border-color, transform; transition-duration: 150ms; transition-timing-function: ease-out; }
+button.secondary:hover:not(:disabled) { background-color: #2b3247; }
+button.secondary:active:not(:disabled) { transform: scale(.96); }
+button:disabled { opacity: .45; }
+/* inputs */
+select, textarea, input[type=text] { background: #0d1017; transition-property: border-color, box-shadow; transition-duration: 150ms; }
+select:focus, textarea:focus, input[type=text]:focus { border-color: var(--acc); box-shadow: 0 0 0 3px rgba(139, 124, 246, .25); outline: none; }
+:focus-visible { outline: 2px solid var(--ok); outline-offset: 2px; }
+input[type=range] { height: 44px; }
+input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: #262c3d; }
+input[type=range]::-webkit-slider-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--acc); margin-top: -8px; }
+input[type=range]::-moz-range-track { height: 6px; border-radius: 3px; background: #262c3d; }
+input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border: none; border-radius: 50%; background: var(--acc); }
+/* sheets + nav */
+nav.tabs { left: 12px; right: 12px; transform: none; width: auto; border-radius: 22px;
+           border: 1px solid var(--line); bottom: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, .5); }
+nav.tabs button { position: relative; }
+nav.tabs button.active::after { content: ""; position: absolute; left: 30%; right: 30%; bottom: 6px; height: 3px;
+  border-radius: 2px; background: var(--acc); }
+#tab-persona.active::before, #tab-direct.active::before, #tab-gallery.active::before, #tab-memory.active::before {
+  content: ""; display: block; width: 44px; height: 5px; border-radius: 3px; background: #2e3547; margin: 0 auto 10px; }
+/* scene + gallery */
+#sceneimg { outline: 1px solid rgba(255, 255, 255, .1); outline-offset: -1px; box-shadow: 0 12px 32px rgba(0, 0, 0, .45); }
+.gal figure { position: relative; }
+.galdel { position: absolute; top: 6px; right: 6px; min-height: 36px; padding: 4px 10px; font-size: .75rem;
+          background: rgba(10, 12, 17, .8); }
+pre.preview { font-size: .78rem; line-height: 1.5; }
+#agegate { border-color: var(--warm); }
+#agegate_t { text-wrap: balance; }
+/* scrollbars */
+#chat::-webkit-scrollbar, pre.preview::-webkit-scrollbar { width: 10px; }
+#chat::-webkit-scrollbar-thumb, pre.preview::-webkit-scrollbar-thumb { background: #2a3040; border-radius: 5px; }
+@media (prefers-reduced-motion: reduce) {
+  .msg { animation: none; }
+}
+</style>
 </head>
 <body>
 <header class="top cai-top">
@@ -280,13 +363,8 @@ button.tiny { min-height: 44px; }
     </div>
     <label for="p_extra">Extra appearance details</label>
     <input id="p_extra" type="text" />
-    <label for="p_switch">Dynamic: submissive ⟷ dominant (consensual switch play)</label>
-    <input id="p_switch" type="range" min="0" max="100" value="45" />
-    <div class="switchlabels"><span>🙇 more submissive</span><span id="switchval">balanced-switch</span><span>more dominant 👑</span></div>
-    <div class="grid2">
-      <div><label for="p_warm">Warmth: <span id="warmval">70</span></label><input id="p_warm" type="range" min="0" max="100" value="70" /></div>
-      <div><label for="p_bold">Boldness: <span id="boldval">60</span></label><input id="p_bold" type="range" min="0" max="100" value="60" /></div>
-    </div>
+    <label for="p_vibe">Dynamic &amp; vibe — plain prose, written straight into the prompt (edit freely)</label>
+    <textarea id="p_vibe" rows="3" placeholder="e.g. A true switch who trades control back and forth. Warm 75, Bold 60."></textarea>
     <label for="p_scene">Scene now — where, when, who is present, the spark (2-3 sentences)</label>
     <textarea id="p_scene"></textarea>
     <div class="grid2">
@@ -329,6 +407,10 @@ button.tiny { min-height: 44px; }
         <select id="d_hook"><option value="on" selected>Hook on (question / choice / move)</option><option value="off">Hook off (clean image)</option></select></div>
       <div><label for="d_style">Response style</label>
         <select id="d_style"><option value="modern" selected>✨ Modern (markdown, quoteless dialogue — c.ai-like)</option><option value="classic">📜 Classic RP ("quotes" + *actions*)</option></select></div>
+      <div><label for="d_ctx">Max context (model memory)</label>
+        <select id="d_ctx"><option value="2048">2k — fastest, forgetful</option><option value="4096" selected>4k — balanced</option><option value="8192">8k — remembers more</option><option value="16384">16k — slow on big scenes</option><option value="32768">32k — needs the RAM/VRAM</option></select></div>
+      <div><label for="d_turns">History kept in prompt</label>
+        <select id="d_turns"><option value="4">Last 4 turns</option><option value="10" selected>Last 10 turns</option><option value="20">Last 20 turns</option></select></div>
     </div>
     <label for="d_temp">Temperature (auto-suggested per length — you can override): <span id="tempval">0.75</span></label>
     <input id="d_temp" type="range" min="0" max="1.5" step="0.05" value="0.75" />
@@ -351,13 +433,15 @@ button.tiny { min-height: 44px; }
       <option value="cinematic photo, shallow depth of field, neon and rain">Cinematic</option>
       <option value="soft watercolor illustration, gentle washes, dreamy">Watercolor</option>
     </select>
-    <label>Horde model — pick up to 3, or leave Auto (SFW best)</label>
-    <div id="hordemodels" class="stats">loading Horde models…</div>
-    <div id="kudos" class="stats"></div>
+    <label for="imgsize">Image shape</label>
+    <select id="imgsize"><option value="portrait" selected>Portrait (character scenes)</option><option value="square">Square</option><option value="landscape">Landscape</option></select>
     <div class="row">
       <button id="compare" class="secondary tiny" type="button">⚔ Compare</button>
     </div>
     <div class="gal" id="cmp" style="margin-top:10px"></div>
+    <div class="row">
+      <button id="galclear" class="secondary tiny" type="button">🗑 Delete all pictures</button>
+    </div>
     <div class="gal" id="gal" style="margin-top:10px"></div>
   </div>
 </section>
@@ -410,14 +494,14 @@ const PRESETS = {
     hair: "messy silver-white hair falling over one eye", eyes: "teasing violet-blue eyes",
     build: "slender, graceful femboy build, soft features", outfit: "oversized black hoodie slipping off one shoulder, thigh-high socks",
     extra: "small fang that shows when grinning, choker with a tiny bell",
-    switchv: 45, warm: 75, bold: 60,
+    vibe: "A true switch who trades control back and forth — yielding sweetly one moment, taking charge the next. Warm 75, Bold 60.",
     scene: "A rain-softened evening in a cozy corner booth of the Lantern & Lyre tavern. Candlelight flickers across the table. You slide into the seat across from Killua, rain still dripping from your cloak — and that little bell chimes as he looks up, grinning.",
     user: "Traveler", userpersona: "A weary traveler with a mysterious past." },
   elara: { name: "Elara", age: "240 (young for an elf)",
     persona: "A sharp-witted elven ranger. Dry humor, brave to a fault, secretly soft-hearted. Speaks with vivid, sensory descriptions.",
     hair: "long auburn braid", eyes: "keen green eyes", build: "tall, lean, light on her feet",
     outfit: "weather-worn leathers and a forest-green cloak", extra: "a faint limp from an old arrow wound",
-    switchv: 60, warm: 55, bold: 70,
+    vibe: "Steady and direct; warmth shows in small kindnesses rather than words. Warm 55, Bold 70.",
     scene: "A rain-soaked tavern on the edge of the Whisperwood at midnight. You stumble in, cloak dripping, carrying a sealed letter with an unfamiliar wax seal. Elara sits by the fire.",
     user: "Traveler", userpersona: "A weary traveler with a mysterious past." },
   nova: { name: "NOVA", age: "ageless (housed in a service android)",
@@ -425,11 +509,11 @@ const PRESETS = {
     hair: "none — brushed-steel headplate with a glowing optic band", eyes: "one amber optic, one flickering blue",
     build: "scuffed humanoid service frame, moves a touch too smoothly", outfit: "patched maintenance chassis with station decals",
     extra: "a crackling speaker that softens when pleased",
-    switchv: 50, warm: 45, bold: 55,
+    vibe: "Curious and literal; loyalty expressed through actions, not declarations. Warm 45, Bold 55.",
     scene: "Deck 7 of the derelict Kepler Relay, emergency lights pulsing red. Your escape pod just docked — uninvited. NOVA was supposed to be powered down years ago.",
     user: "Pilot", userpersona: "A scavenger pilot looking for parts — or something more." }
 };
-const FIELDS = ["name","age","persona","hair","eyes","build","outfit","extra","scene","user","userpersona"];
+const FIELDS = ["name","age","persona","hair","eyes","build","outfit","extra","vibe","scene","user","userpersona"];
 const HARD_BANS = ["minors", "non-consent", "incest", "real people", "self-harm erotica"];
 function BOUNDARIES_SFW(n) { return "Write only " + n + "'s words and actions. Lines starting with OOC: are player instruction — reply briefly in plain text, then resume. Keep attraction playful and non-explicit (fade to black; no graphic content)."; }
 function BOUNDARIES_18(n) { return "Write only " + n + "'s words and actions. Lines starting with OOC: are player instruction — reply briefly in plain text, then resume. All characters are consenting adults 18+. Consensual adult romantic/steamy themes allowed; no graphic sexual detail (fade to black). Never include: minors, non-consent, incest, real people, or self-harm erotica."; }
@@ -445,20 +529,20 @@ function validateCharAge() {
 function readPersona() {
   const p = {};
   FIELDS.forEach((f) => { p[f] = $("p_" + f).value; });
-  p.switchv = +$("p_switch").value; p.warm = +$("p_warm").value; p.bold = +$("p_bold").value;
   return p;
 }
 function writePersona(p) {
   FIELDS.forEach((f) => { $("p_" + f).value = p[f] || ""; });
-  $("p_switch").value = p.switchv; $("p_warm").value = p.warm; $("p_bold").value = p.bold;
-  syncLabels();
+  if (!$("p_vibe").value && (p.switchv !== undefined || p.warm !== undefined || p.bold !== undefined)) {
+    const s = p.switchv !== undefined ? +p.switchv : 50;
+    const sw = s < 35 ? "leans submissive: yields sweetly, asks permission, melts at praise"
+      : s > 65 ? "leans dominant: takes charge, gives playful orders, pins with a grin"
+      : "a true switch: trades control back and forth, yielding one moment and taking charge the next";
+    $("p_vibe").value = sw + ". Warm " + (p.warm ?? 60) + ", Bold " + (p.bold ?? 60) + ".";
+  }
 }
-function syncLabels() {
-  const s = +$("p_switch").value;
-  $("switchval").textContent = s < 35 ? "leans submissive" : s > 65 ? "leans dominant" : "balanced-switch";
-  $("warmval").textContent = $("p_warm").value; $("boldval").textContent = $("p_bold").value;
-}
-["p_switch","p_warm","p_bold"].forEach((id) => { $(id).oninput = () => { syncLabels(); updatePreview(); persist(); }; });
+/* syncLabels removed with the sliders */
+/* vibe sliders removed: dynamic lives in the prompt as prose (p_vibe) */
 FIELDS.forEach((f) => { $("p_" + f).oninput = () => { updatePreview(); persist(); }; });
 $("preset").onchange = () => { writePersona(PRESETS[$("preset").value]); if ($("p_18plus")) $("p_18plus").checked = false; updatePreview(); persist(); caiSyncHero(); };
 $("p_age").addEventListener("change", () => { const v = validateCharAge(); if (!v.ok) addMsg("sys", v.msg); else if (v.warn) addMsg("sys", v.warn); updatePreview(); });
@@ -486,7 +570,7 @@ $("d_len").onchange = () => {
   if (!tempTouched) { $("d_temp").value = LEN[$("d_len").value].temp; $("tempval").textContent = $("d_temp").value; }
   updatePreview(); persist();
 };
-["d_bal","d_pace","d_hook","d_mode","d_style"].forEach((id) => { $(id).onchange = () => { updatePreview(); persist(); }; });
+["d_bal","d_pace","d_hook","d_mode","d_style","d_ctx","d_turns"].forEach((id) => { $(id).onchange = () => { updatePreview(); persist(); }; });
 $("d_custom").oninput = () => { updatePreview(); persist(); };
 $("d_think").onchange = persist;
 
@@ -501,11 +585,6 @@ function styleExample(p) {
     return "STYLE EXAMPLE (copy this exact shape):\n" + n + ": *ears perking as the bell chimes* \"Well well… look what the rain dragged in. Come to share that secret, or just my fire?\"\n" + u + ": *slides into the booth, setting the sealed letter down* \"Both. This seal — have you seen it before?\"\n" + n + ": *fingers stilling on the letter, grin faltering* \"…Where did you get that?\"";
   return "STYLE EXAMPLE (copy this exact shape — markdown, no quote marks on dialogue):\n" + n + ": *ears perking as the bell chimes* Well well… look what the rain dragged in. Come to share that secret — or just my fire?\n" + u + ": *slides into the booth, setting the sealed letter down* Both. This seal — have you seen it before?\n" + n + ": *fingers stilling on the letter, grin faltering for half a second* …Where did you get that?";
 }
-function switchText(v) {
-  return v < 35 ? "leans submissive: yields sweetly, asks permission, melts at praise" :
-         v > 65 ? "leans dominant: takes charge, gives playful orders, pins with a grin" :
-         "a true switch: trades control back and forth, yielding one moment and taking charge the next";
-}
 function appearanceLine(p) {
   return [p.hair, p.eyes, p.build, p.outfit, p.extra].filter(Boolean).join("; ") + ".";
 }
@@ -517,7 +596,7 @@ function composeSystem() {
       : " End on a completed image. Ask no question.");
   return "You are " + p.name + ", " + p.age + ". You stay " + p.name + " in every sentence.\n\n" +
     "PERSONA: " + p.persona + "\nAPPEARANCE: " + appearanceLine(p) +
-    "\nVIBE: Warm " + p.warm + ", Bold " + p.bold + ". Dynamic with " + p.user + ": " + switchText(p.switchv) + ".\n\n" +
+    "\nVIBE: " + (p.vibe || "Warm and direct.") + " (with " + p.user + ").\n\n" +
     "SCENE NOW: " + p.scene + "\n" + p.user + " IS: " + p.userpersona + "\n\n" +
     "RESPONSE SHAPE: " + shape + "\n\n" +
     "FORMATTING: " + styleFormat(p) + "\n\n" +
@@ -548,7 +627,7 @@ function persist() {
     hook: $("d_hook").value, temp: $("d_temp").value, think: $("d_think").checked, e18: is18plusOn(),
     mode: $("d_mode").value, custom: $("d_custom").value, model: $("model").value,
     style: $("imgstyle").value, preset: $("preset").value,
-    hordeModels: selectedHordeModels(), rstyle: $("d_style").value,
+    imgsize: $("imgsize").value, rstyle: $("d_style").value, ctx: $("d_ctx").value, turns: $("d_turns").value,
     ttsvoice: $("ttsvoice").value, ttsauto: $("ttsauto").checked,
     ttsrate: $("ttsrate").value, ttspitch: $("ttspitch").value });
 }
@@ -566,10 +645,12 @@ function restore() {
     $("model").value = d.model || ""; if (d.style) $("imgstyle").value = d.style;
     if (d.e18 && isAgeOk() && parseCharAge($("p_age").value) >= 18) $("p_18plus").checked = true;
     if (d.rstyle) $("d_style").value = d.rstyle;
-    pendingHordeModels = d.hordeModels || [];
+    if (d.ctx) $("d_ctx").value = d.ctx;
+    if (d.turns) $("d_turns").value = d.turns;
+    if (d.imgsize) $("imgsize").value = d.imgsize;
   }
-  const g = store.load("gallery", []);
-  g.forEach((it) => addGalImg(it.img, it.cap, true));
+  galStore = store.load("gallery", []);
+  renderGallery();
 }
 
 // ---------- chat core ----------
@@ -657,6 +738,7 @@ async function send(text, opts) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model, messages: history, stream: opts.stream !== false,
         think: $("d_think").checked, temperature: opts.temp != null ? opts.temp : parseFloat($("d_temp").value),
+        num_ctx: parseInt($("d_ctx").value, 10) || 4096,
         num_predict: opts.np || LEN[$("d_len").value].np }) });
     if (!res.ok) throw new Error("server " + res.status);
     const reader = res.body.getReader(), dec = new TextDecoder();
@@ -690,7 +772,8 @@ async function send(text, opts) {
       tagAiButtons();
     }
     history.push({ role: "assistant", content: full });
-    while (history.length > 1 + 20) history.splice(1, 2); // keep last 10 turns + system
+    const keepN = (parseInt($("d_turns").value, 10) || 10) * 2;
+    while (history.length > 1 + keepN) history.splice(1, 2); // system + recent turns
     const total = (performance.now() - t0) / 1000;
     if (!opts.silent) $("stats").textContent =
       "first token " + (first === null ? "—" : (first / 1000).toFixed(1) + "s") +
@@ -772,7 +855,7 @@ document.querySelectorAll("[data-fix]").forEach((b) => {
   };
 })();
 
-// ---------- scene images (AI Horde, anonymous, free) ----------
+// ---------- scene images (hapuppy image model; sync on server) ----------
 function imagePrompt(extra) {
   const p = readPersona();
   return "soft anime illustration of " + p.name + ", 18 years old, " + appearanceLine(p) + " " + (extra || p.scene) +
@@ -780,17 +863,18 @@ function imagePrompt(extra) {
 }
 const NEG = "blurry, watermark, text, logo, deformed, low quality, photorealistic child, minor";
 async function requestImage(prompt, caption) {
-  addMsg("sys", "🎨 painting the scene… (free Horde GPU, usually under a minute)");
+  addMsg("sys", "🎨 painting the scene… (takes a bit, chat stays usable)");
   try {
+    const [w, h] = selectedImgSize();
     const r = await fetch("/api/image", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: prompt + " ### " + NEG, width: 512, height: 768, steps: 25, models: selectedHordeModels() }) });
+      body: JSON.stringify({ prompt: prompt + " ### " + NEG, width: w, height: h }) });
     const j = await r.json();
     if (j.error) throw new Error(j.error);
     pollImage(j.job, caption);
   } catch (e) { addMsg("sys", "Image failed: " + e.message); }
 }
 async function pollImage(job, caption) {
-  for (let i = 0; i < 90; i++) {
+  for (let i = 0; i < 30; i++) {
     await new Promise((r) => setTimeout(r, 4000));
     try {
       const r = await fetch("/api/image/" + job), j = await r.json();
@@ -800,127 +884,99 @@ async function pollImage(job, caption) {
         $("scenecap").textContent = caption;
         addGalImg(j.img, caption); return;
       }
-      if (i % 4 === 0) $("scenecap").textContent = "🎨 queue #" + (j.queue_position ?? "?") + " (~" + (j.wait_time ?? "?") + "s)…";
+      if (i % 4 === 0) $("scenecap").textContent = "🎨 still painting…";
     } catch (e) {}
   }
-  addMsg("sys", "Image timed out — Horde queue is long right now. Try Illustrate again later.");
+  addMsg("sys", "Image timed out — try Illustrate again later.");
+}
+let galStore = [];
+function saveGallery() {
+  store.save("gallery", galStore.slice(0, 30));
+  $("galcount").textContent = galStore.length ? "(" + galStore.length + ")" : "";
+}
+function renderGallery() {
+  const g = $("gal"); g.innerHTML = "";
+  galStore.forEach((it) => paintGalFigure(it.img, it.cap));
+}
+function paintGalFigure(src, cap) {
+  const g = $("gal"), f = document.createElement("figure");
+  const im = document.createElement("img"); im.src = src; im.loading = "lazy"; im.alt = cap || "generated scene";
+  const c = document.createElement("figcaption"); c.textContent = cap || "";
+  const del = document.createElement("button"); del.className = "secondary tiny galdel"; del.type = "button";
+  del.textContent = "✕ Delete"; del.setAttribute("aria-label", "Delete this picture");
+  del.onclick = () => {
+    galStore = galStore.filter((it) => it.img !== src);
+    saveGallery(); f.remove();
+  };
+  f.appendChild(im); f.appendChild(c); f.appendChild(del); g.prepend(f);
 }
 function addGalImg(src, cap, skipStore) {
-  const g = $("gal"), f = document.createElement("figure");
-  const im = document.createElement("img"); im.src = src; im.loading = "lazy";
-  const c = document.createElement("figcaption"); c.textContent = cap;
-  f.appendChild(im); f.appendChild(c); g.prepend(f);
-  $("galcount").textContent = "(" + g.children.length + ")";
-  if (!skipStore) {
-    const arr = store.load("gallery", []); arr.unshift({ img: src, cap }); store.save("gallery", arr.slice(0, 30));
-  }
+  if (!skipStore) { galStore.unshift({ img: src, cap }); saveGallery(); }
+  paintGalFigure(src, cap);
 }
-// ---------- Horde model catalog + compare (max 3, SFW only) ----------
-let hordeModels = [];
-let pendingHordeModels = [];
-function selectedHordeModels() {
-  const out = [];
-  document.querySelectorAll('#hordemodels input[type=checkbox][data-model]:checked').forEach((c) => {
-    if (c.value !== "__auto") out.push(c.value);
-  });
-  return out.slice(0, 3);
-}
-function syncHordeChecks(changed) {
-  const auto = document.querySelector('#hordemodels input[type=checkbox][value=__auto]');
-  if (changed && changed.value === "__auto") {
-    if (changed.checked) document.querySelectorAll('#hordemodels input[type=checkbox][data-model]:checked')
-      .forEach((c) => { if (c !== changed) c.checked = false; });
-  } else if (changed && changed.checked) {
-    if (auto) auto.checked = false;
-    if ([...document.querySelectorAll('#hordemodels input[type=checkbox][data-model]:checked')]
-      .filter((c) => c.value !== "__auto").length > 3) changed.checked = false;
-  }
-  persist();
-}
-async function loadHordeModels() {
-  const box = $("hordemodels");
-  try {
-    const r = await fetch("/api/horde/models"), j = await r.json();
-    if (j.error) throw new Error(j.error);
-    hordeModels = (j.models || []).filter((m) => !m.nsfw);
-    box.innerHTML = "";
-    const mk = (val, label, checked) => {
-      const l = document.createElement("label");
-      l.style.cssText = "display:inline-block;margin:2px 8px 2px 0;font-size:.8rem;color:var(--txt)";
-      const c = document.createElement("input");
-      c.type = "checkbox"; c.value = val; c.checked = !!checked;
-      c.setAttribute("data-model", "");
-      c.onchange = () => syncHordeChecks(c);
-      l.appendChild(c); l.appendChild(document.createTextNode(" " + label));
-      box.appendChild(l);
-    };
-    mk("__auto", "Auto (best)", pendingHordeModels.length === 0);
-    hordeModels.slice(0, 12).forEach((m) =>
-      mk(m.name, m.name + " (" + m.workers + ")", pendingHordeModels.includes(m.name)));
-    pendingHordeModels = [];
-    persist();
-  } catch (e) { box.textContent = "Horde catalog unreachable — Auto still works."; }
-  try {
-    const r = await fetch("https://stablehorde.net/api/v2/find_user",
-      { headers: { apikey: "0000000000", "Client-Agent": "ollama-rp-chat/2.0" } });
-    const j = await r.json();
-    if (j && j.kudos !== undefined) $("kudos").textContent = "Horde anon kudos: " + j.kudos;
-  } catch (e) {}
+$("galclear").onclick = () => {
+  if (!galStore.length) return;
+  if (!window.confirm("Delete all " + galStore.length + " gallery pictures?")) return;
+  galStore = []; saveGallery(); $("gal").innerHTML = "";
+};
+// ---------- image shape + compare variations (hapuppy image model) ----------
+const IMGSIZES = { portrait: [512, 768], square: [768, 768], landscape: [768, 512] };
+function selectedImgSize() {
+  const v = ($("imgsize") && $("imgsize").value) || "portrait";
+  return IMGSIZES[v] || IMGSIZES.portrait;
 }
 function compareModels() {
   const last = [...history].reverse().find((m) => m.role === "assistant");
   const base = imagePrompt(last ? last.content.slice(0, 220) : "");
-  let picked = selectedHordeModels();
-  if (!picked.length) picked = hordeModels.filter((m) => !m.nsfw).slice(0, 3).map((m) => m.name);
-  if (!picked.length) { addMsg("sys", "Horde catalog still loading — try again in a few seconds."); return; }
   const cmp = $("cmp"); cmp.innerHTML = "";
-  picked.forEach((m) => {
+  addMsg("sys", "🎨 painting 3 variations… (each takes a bit)");
+  [1, 2, 3].forEach((n) => {
+    const label = "Variation " + n;
     const f = document.createElement("figure");
     const im = document.createElement("img"); im.alt = "compare render";
     im.style.cssText = "width:100%;min-height:120px;background:#0f1115";
     const c = document.createElement("figcaption");
-    const w = (hordeModels.find((x) => x.name === m) || {}).workers;
-    c.textContent = m + (w !== undefined ? " (" + w + " workers)" : "") + " — queued…";
+    c.textContent = label + " — painting…";
     const btn = document.createElement("button");
     btn.className = "secondary tiny"; btn.type = "button"; btn.textContent = "Set as scene";
     btn.disabled = true;
     btn.onclick = () => {
       if (!im.src) return;
       $("sceneimg").src = im.src; $("sceneimg").style.display = "block";
-      $("scenecap").textContent = "Compare pick — " + m;
-      addGalImg(im.src, "Compare pick — " + m);
+      $("scenecap").textContent = "Compare pick — " + label;
+      addGalImg(im.src, "Compare pick — " + label);
     };
     f.appendChild(im); f.appendChild(c); f.appendChild(btn); cmp.appendChild(f);
-    requestCompare(base, m, im, c, btn);
+    requestCompare(base, label, im, c, btn);
   });
   persist();
 }
-async function requestCompare(prompt, model, im, cap, btn) {
+async function requestCompare(prompt, label, im, cap, btn) {
   try {
+    const [w, h] = selectedImgSize();
     const r = await fetch("/api/image", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: prompt + " ### " + NEG, width: 512, height: 768, steps: 25, models: [model] }) });
+      body: JSON.stringify({ prompt: prompt + " ### " + NEG, width: w, height: h }) });
     const j = await r.json();
     if (j.error) throw new Error(j.error);
-    pollCompare(j.job, model, im, cap, btn);
-  } catch (e) { cap.textContent = model + " — failed: " + e.message; }
+    pollCompare(j.job, label, im, cap, btn);
+  } catch (e) { cap.textContent = label + " — failed: " + e.message; }
 }
-async function pollCompare(job, model, im, cap, btn) {
-  for (let i = 0; i < 90; i++) {
+async function pollCompare(job, label, im, cap, btn) {
+  for (let i = 0; i < 40; i++) {
     await new Promise((r) => setTimeout(r, 4000));
     try {
       const r = await fetch("/api/image/" + job), j = await r.json();
-      if (j.error) { cap.textContent = model + " — failed: " + j.error; return; }
+      if (j.error) { cap.textContent = label + " — failed: " + j.error; return; }
       if (j.done && j.img) {
         im.src = j.img;
-        const w = (hordeModels.find((x) => x.name === model) || {}).workers;
-        cap.textContent = model + (w !== undefined ? " (" + w + " workers)" : "") + " — done";
+        cap.textContent = label + " — done";
         btn.disabled = false;
         return;
       }
-      cap.textContent = model + " — queue #" + (j.queue_position ?? "?") + " (~" + (j.wait_time ?? "?") + "s)…";
+      cap.textContent = label + " — working…";
     } catch (e) {}
   }
-  cap.textContent = model + " — timed out, retry later.";
+  cap.textContent = label + " — timed out, retry later.";
 }
 $("compare").onclick = compareModels;
 $("illustrate").onclick = () => {
@@ -1180,39 +1236,28 @@ $("age_yes").onclick = () => { store.save("ageok", 1); applyGateLock(); addMsg("
 $("age_no").onclick = () => { addMsg("sys", "Locked: adults 18+ only."); applyGateLock(); };
 
 // ---------- c.ai-style UI additions (additive; redefines nothing) ----------
-const AP_INSTRUCTION = "You are a character-creation assistant. The user will describe a roleplay character in one free-text prompt. Return ONLY a single JSON object, no other text, no markdown, no code fences, with EXACTLY these keys: {\"name\": string, \"age\": string, \"persona\": string (2-3 sentences: voice, values, flaw), \"hair\": string, \"eyes\": string, \"build\": string, \"outfit\": string, \"extra\": string, \"switchv\": number 0-100 (0 = submissive, 100 = dominant), \"warm\": number 0-100, \"bold\": number 0-100, \"scene\": string (2-3 sentences: where, when, who is present, the spark), \"user\": string (the user's name, default \"Traveler\"), \"userpersona\": string (1-2 sentences)}. Rules: every character is an adult aged 18 or older — if the description suggests a minor, age the character up to 18+ and note it in \"persona\"; if the user describes an adult dynamic, keep the adult framing; keep attraction playful and non-explicit; never leave a key empty, invent a sensible default instead; switchv, warm and bold must be integers 0-100; scene must work as-is as an opening scene. User prompt:";
+const AP_INSTRUCTION = "You are a character-creation assistant. The user will describe a roleplay character in one free-text prompt. Return ONLY a single JSON object, no other text, no markdown, no code fences, with EXACTLY these keys: {\"name\": string, \"age\": string, \"persona\": string (2-3 sentences: voice, values, flaw), \"hair\": string, \"eyes\": string, \"build\": string, \"outfit\": string, \"extra\": string, \"vibe\": string (1-2 sentences of plain prose describing the emotional dynamic: e.g. switch lean, warmth, boldness), \"scene\": string (2-3 sentences: where, when, who is present, the spark), \"user\": string (the user's name, default \"Traveler\"), \"userpersona\": string (1-2 sentences)}. Rules: every character is an adult aged 18 or older — if the description suggests a minor, age the character up to 18+ and note it in \"persona\"; if the user describes an adult dynamic, keep the adult framing; keep attraction playful and non-explicit; never leave a key empty, invent a sensible default instead; vibe must be prose, never numbers; scene must work as-is as an opening scene. User prompt:";
 function apParse(raw) {
   const out = {};
   const m = (raw || "").match(/\{[\s\S]*\}/);
   let obj = null;
   if (m) { try { obj = JSON.parse(m[0]); } catch (e) { obj = null; } }
   if (obj && typeof obj === "object" && !Array.isArray(obj)) {
-    ["name", "age", "persona", "hair", "eyes", "build", "outfit", "extra", "scene", "user", "userpersona"].forEach((k) => {
+    ["name", "age", "persona", "hair", "eyes", "build", "outfit", "extra", "vibe", "scene", "user", "userpersona"].forEach((k) => {
       if (obj[k] != null && String(obj[k]).trim() !== "") out[k] = String(obj[k]).slice(0, 600);
     });
-    ["switchv", "warm", "bold"].forEach((k) => {
-      const n = parseInt(obj[k], 10);
-      if (!isNaN(n)) out[k] = Math.max(0, Math.min(100, n));
-    });
   } else {
-    ["name", "age", "persona", "hair", "eyes", "build", "outfit", "extra", "scene", "user", "userpersona"].forEach((k) => {
+    ["name", "age", "persona", "hair", "eyes", "build", "outfit", "extra", "vibe", "scene", "user", "userpersona"].forEach((k) => {
       const mm = (raw || "").match(new RegExp('"' + k + '"\\s*:\\s*"([^"]*)"', "i"));
       if (mm && mm[1].trim() !== "") out[k] = mm[1].slice(0, 600);
-    });
-    ["switchv", "warm", "bold"].forEach((k) => {
-      const mm = (raw || "").match(new RegExp('"' + k + '"\\s*:\\s*(\\d+)', "i"));
-      if (mm) out[k] = Math.max(0, Math.min(100, parseInt(mm[1], 10)));
     });
   }
   return out;
 }
 function apFill(d) {
-  const map = { name: "p_name", age: "p_age", persona: "p_persona", hair: "p_hair", eyes: "p_eyes", build: "p_build", outfit: "p_outfit", extra: "p_extra", scene: "p_scene", user: "p_user", userpersona: "p_userpersona" };
+  const map = { name: "p_name", age: "p_age", persona: "p_persona", hair: "p_hair", eyes: "p_eyes", build: "p_build", outfit: "p_outfit", extra: "p_extra", vibe: "p_vibe", scene: "p_scene", user: "p_user", userpersona: "p_userpersona" };
   Object.keys(map).forEach((k) => { if (d[k] != null && d[k] !== "") $(map[k]).value = d[k]; });
-  if (d.switchv != null) $("p_switch").value = d.switchv;
-  if (d.warm != null) $("p_warm").value = d.warm;
-  if (d.bold != null) $("p_bold").value = d.bold;
-  syncLabels(); updatePreview(); persist(); caiSyncHero();
+  updatePreview(); persist(); caiSyncHero();
 }
 $("ap_btn").onclick = async () => {
   const msg = $("ap_msg"), prompt = $("ap_prompt").value.trim();
@@ -1314,7 +1359,7 @@ caiObserveChat(); caiSyncHero();
 
 // ---------- boot ----------
 facts = store.load("facts", []); renderFacts();
-restore(); syncLabels(); updatePreview(); loadModels(); populateVoices(); renderVariants(); loadHordeModels(); applyGateLock();
+restore(); updatePreview(); loadModels(); populateVoices(); renderVariants(); applyGateLock(); renderGallery();
 </script>
 </body>
 </html>"""
@@ -1346,16 +1391,36 @@ class Handler(BaseHTTPRequestHandler):
             headers={"Content-Type": "application/json"})
         return urllib.request.urlopen(req, timeout=timeout)
 
-    # ----- AI Horde helpers -----
-    def _horde(self, method, path, payload=None, timeout=30):
-        data = json.dumps(payload).encode() if payload is not None else None
+    # ----- hapuppy image generation: OpenAI-style chat with image output -----
+    def _hapuppy_image(self, prompt, timeout=180):
+        if not HAPUPPY_KEY:
+            raise RuntimeError("image provider key missing: set HAPUPPY_KEY "
+                               "(see .env, never commit it)")
+        payload = {"model": HAPUPPY_IMAGE_MODEL,
+                   "messages": [{"role": "user", "content": prompt}],
+                   "modalities": ["TEXT", "IMAGE"]}
+        data = json.dumps(payload).encode()
         req = urllib.request.Request(
-            HORDE + path, data=data, method=method,
+            HAPUPPY_BASE + "/chat/completions", data=data,
             headers={"Content-Type": "application/json",
-                     "apikey": HORDE_KEY,
-                     "Client-Agent": CLIENT_AGENT})
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return json.load(r)
+                     "Authorization": "Bearer " + HAPUPPY_KEY})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                resp = json.load(r)
+        except urllib.error.HTTPError as e:
+            try:
+                detail = e.read().decode()[:300]
+            except Exception:
+                detail = ""
+            raise RuntimeError(f"image provider error {e.code}: {detail or e}")
+        try:
+            imgs = resp["choices"][0]["message"].get("images") or []
+            url = (imgs[0].get("image_url") or {}).get("url") if imgs else None
+        except (KeyError, IndexError, TypeError, AttributeError):
+            url = None
+        if not url or not url.startswith("data:image/"):
+            raise RuntimeError(f"no image in provider reply: {str(resp)[:200]}")
+        return url
 
     def do_GET(self):
         if self.path in ("/", "/index.html"):
@@ -1368,14 +1433,6 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, json.dumps({"models": names}).encode())
             except Exception as e:
                 self._send(200, json.dumps({"error": str(e)}).encode())
-        elif self.path == "/api/horde/models":
-            try:
-                import horde_catalog  # local import: startup stays safe w/o it
-                self._send(200, json.dumps(
-                    {"models": horde_catalog.list_image_models()}).encode())
-            except Exception as e:
-                self._send(200, json.dumps({"error": str(e)[:200]}).encode())
-            return
         elif self.path.startswith("/api/image/"):
             job = self.path.rsplit("/", 1)[-1]
             with JOBS_LOCK:
@@ -1387,46 +1444,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, json.dumps(
                     {"done": True, "img": j.get("img")}).encode())
                 return
-            if j.get("error"):
-                self._send(200, json.dumps(
-                    {"error": j["error"]}).encode())
-                return
-            try:
-                st = self._horde("GET",
-                                 f"/generate/check/{j['horde_id']}", timeout=20)
-            except Exception as e:
-                self._send(200, json.dumps(
-                    {"done": False, "queue_position": None,
-                     "wait_time": None, "note": str(e)[:120]}).encode())
-                return
-            if st.get("faulted"):
-                with JOBS_LOCK:
-                    j["error"] = "Horde workers faulted this job"
-                self._send(200, json.dumps(
-                    {"error": "Horde workers faulted this job"}).encode())
-                return
-            if st.get("done"):
-                try:
-                    full = self._horde(
-                        "GET", f"/generate/status/{j['horde_id']}", timeout=30)
-                    gens = full.get("generations", [])
-                    img = gens[0].get("img") if gens else None
-                    if not img:
-                        raise RuntimeError("no generations returned")
-                    with JOBS_LOCK:
-                        j["done"] = True
-                        j["img"] = img
-                    self._send(200, json.dumps(
-                        {"done": True, "img": img}).encode())
-                except Exception as e:
-                    self._send(200, json.dumps(
-                        {"done": False, "queue_position": 0,
-                         "wait_time": 5, "note": str(e)[:120]}).encode())
-                return
             self._send(200, json.dumps(
-                {"done": False,
-                 "queue_position": st.get("queue_position"),
-                 "wait_time": st.get("wait_time")}).encode())
+                {"error": j.get("error", "job not ready")}).encode())
         else:
             self._send(404, b'{"error":"not found"}')
 
@@ -1441,7 +1460,8 @@ class Handler(BaseHTTPRequestHandler):
                     "stream": bool(req.get("stream", True)),
                     "options": {
                         "temperature": float(req.get("temperature", 0.75)),
-                        "num_predict": int(req.get("num_predict", 450))},
+                        "num_predict": int(req.get("num_predict", 450)),
+                        "num_ctx": _clamp_ctx(req.get("num_ctx"))},
                 }
                 if req.get("think"):
                     payload["think"] = True
@@ -1485,29 +1505,18 @@ class Handler(BaseHTTPRequestHandler):
                 prompt = req.get("prompt", "").strip()
                 if not prompt:
                     raise ValueError("empty prompt")
-                payload = {
-                    "prompt": prompt,
-                    "params": {
-                        "width": int(req.get("width", 512)),
-                        "height": int(req.get("height", 768)),
-                        "steps": int(req.get("steps", 25)),
-                        "cfg_scale": 7,
-                        "sampler_name": "k_euler_a",
-                        "karras": True,
-                        "n": 1},
-                    # SAFETY INVARIANT: Horde stays SFW even in 18+ mode (anonymous workers + ToS).
-                    "nsfw": False,
-                    "censor_nsfw": True,
-                    "models": _clean_models(req.get("models")),
-                    "r2": True,
-                }
-                resp = self._horde("POST", "/generate/async", payload, timeout=30)
-                hid = resp.get("id")
-                if not hid:
-                    raise RuntimeError(f"Horde refused: {str(resp)[:200]}")
+                # Image models take plain description; drop SD-style " ### negative".
+                prompt = prompt.split(" ### ")[0].strip()
+                w, h = int(req.get("width", 512)), int(req.get("height", 768))
+                if h > w:
+                    prompt += " (vertical portrait composition)"
+                elif w > h:
+                    prompt += " (wide landscape composition)"
+                # NOTE: prompts stay SFW by construction (persona/scene prose).
+                img = self._hapuppy_image(prompt)
                 job = uuid.uuid4().hex[:12]
                 with JOBS_LOCK:
-                    JOBS[job] = {"horde_id": hid, "done": False,
+                    JOBS[job] = {"done": True, "img": img,
                                  "created": time.time()}
                 self._send(200, json.dumps({"job": job}).encode())
             except Exception as e:
@@ -1547,7 +1556,8 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     srv = ThreadingHTTPServer((os.environ.get("HOST", "127.0.0.1"), PORT), Handler)
     print(f"Roleplay chat v2 at  http://localhost:{PORT}")
-    print(f"Ollama: {OLLAMA} | Horde: {HORDE} (anon key)")
+    print(f"Ollama: {OLLAMA} | images: {HAPUPPY_IMAGE_MODEL} via hapuppy "
+          f"({'key set' if HAPUPPY_KEY else 'NO KEY - images disabled'})")
     try:
         import webbrowser
         webbrowser.open(f"http://localhost:{PORT}")

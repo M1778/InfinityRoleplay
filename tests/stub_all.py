@@ -2,8 +2,9 @@
 """
 InfinityRoleplay QA stub: ONE combined fake backend (stdlib only).
 
-Emulates Ollama AND AI Horde on a single port so tests/test_contract.py can
-point OLLAMA_HOST and HORDE_BASE at the same stub with zero live-network use.
+Emulates Ollama AND the hapuppy image endpoint on a single port so
+tests/test_contract.py can point OLLAMA_HOST and HAPUPPY_BASE at the same
+stub with zero live-network use.
 
   Ollama emulation
     GET  /api/tags        -> {"models": [{"name": "test-model"}, ...]}
@@ -17,15 +18,15 @@ point OLLAMA_HOST and HORDE_BASE at the same stub with zero live-network use.
                            absurd num_predict (>100M) => 400 (lets the fuzz
                              suite assert the app never 500s on forwardable
                              garbage; real Ollama limits may differ)
-  Horde emulation
-    POST /generate/async  -> validates the frozen contract:
-                             nsfw is False, censor_nsfw is True, r2 is True,
-                             `apikey` header present, `Client-Agent` present.
-                             Violations => 400/401. OK => {"id": ...}
-    GET  /generate/check/<id>  -> {"done": true, ...} immediately
-    GET  /generate/status/<id> -> {"generations": [{"img": <data URI>}]}
+  hapuppy image emulation (OpenAI-style chat with image output)
+    POST /v1/chat/completions -> validates: Authorization Bearer present,
+                             model non-empty, messages non-empty list,
+                             modalities includes "IMAGE".
+                             Violations => 400/401. OK => {"choices":
+                             [{"message": {"images": [{"image_url":
+                             {"url": <data URI>}}]}}]}
   Test introspection (stub-only, not part of the app contract)
-    GET  /__stub/horde-last    -> last validated async request actually
+    GET  /__stub/image-last    -> last validated image request actually
                                   received from the app (headers + payload)
 
 Usage:
@@ -39,9 +40,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 IMG = ("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ"
        "AAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
 KNOWN_MODELS = ["test-model", "test-model-2"]
-HORDE_ID = "stub-horde-id-1"
+STUB_IMAGE_MODEL = "stub-image-model"
 MAX_NUM_PREDICT = 100_000_000
-LAST_HORDE = {"calls": 0, "headers": {}, "payload": {}}
+LAST_IMAGE = {"calls": 0, "headers": {}, "payload": {}}
 
 
 class Stub(BaseHTTPRequestHandler):
@@ -74,22 +75,16 @@ class Stub(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/api/tags":
             self._send(200, {"models": [{"name": m, "model": m} for m in KNOWN_MODELS]})
-        elif self.path.startswith("/generate/check/"):
-            self._send(200, {"done": True, "faulted": False,
-                             "queue_position": 0, "wait_time": 0})
-        elif self.path.startswith("/generate/status/"):
-            self._send(200, {"done": True, "generations": [
-                {"img": IMG, "model": "stub", "worker_name": "qa-stub"}]})
-        elif self.path == "/__stub/horde-last":
-            self._send(200, LAST_HORDE)
+        elif self.path == "/__stub/image-last":
+            self._send(200, LAST_IMAGE)
         else:
             self._send(404, {"error": "stub: not found: " + self.path})
 
     def do_POST(self):
         if self.path == "/api/chat":
             self._chat()
-        elif self.path == "/generate/async":
-            self._horde_async()
+        elif self.path in ("/v1/chat/completions", "/chat/completions"):
+            self._hapuppy_image()
         else:
             self._send(404, {"error": "stub: not found: " + self.path})
 
@@ -153,34 +148,35 @@ class Stub(BaseHTTPRequestHandler):
                 "done_reason": "stop",
             })
 
-    def _horde_async(self):
+    def _hapuppy_image(self):
         payload, err = self._read_json()
         if err or not isinstance(payload, dict):
             self._send(400, {"error": "stub: bad request: " + (err or "not an object")})
             return
-        apikey = self.headers.get("apikey")
-        agent = self.headers.get("Client-Agent")
-        if not apikey:
-            self._send(401, {"error": "stub: missing apikey header"})
+        auth = self.headers.get("Authorization", "")
+        if not auth.startswith("Bearer ") or len(auth) <= 7:
+            self._send(401, {"error": "stub: missing/invalid Bearer auth"})
             return
-        if not agent:
-            self._send(400, {"error": "stub: missing Client-Agent header"})
+        if not isinstance(payload.get("model"), str) or not payload["model"]:
+            self._send(400, {"error": "stub: 'model' must be a non-empty string"})
             return
-        for key, want in (("nsfw", False), ("censor_nsfw", True), ("r2", True)):
-            if payload.get(key) is not want:
-                self._send(400, {"error": "stub: horde contract violation: %r must be %r"
-                                          % (key, want)})
-                return
-        LAST_HORDE["calls"] += 1
-        LAST_HORDE["headers"] = {"apikey": apikey, "client-agent": agent}
-        LAST_HORDE["payload"] = {
-            "nsfw": payload.get("nsfw"),
-            "censor_nsfw": payload.get("censor_nsfw"),
-            "r2": payload.get("r2"),
-            "prompt_len": len(str(payload.get("prompt", ""))),
-            "params": payload.get("params", {}),
+        if not isinstance(payload.get("messages"), list) or not payload["messages"]:
+            self._send(400, {"error": "stub: 'messages' must be a non-empty list"})
+            return
+        if "IMAGE" not in (payload.get("modalities") or []):
+            self._send(400, {"error": "stub: modalities must include IMAGE"})
+            return
+        LAST_IMAGE["calls"] += 1
+        LAST_IMAGE["headers"] = {"authorization": "Bearer <redacted>",
+                                 "model": payload.get("model")}
+        LAST_IMAGE["payload"] = {
+            "model": payload.get("model"),
+            "modalities": payload.get("modalities"),
+            "prompt_len": len(str((payload.get("messages") or [{}])[-1].get("content", ""))),
         }
-        self._send(202, {"id": HORDE_ID, "message": "stub accepted"})
+        self._send(200, {"choices": [{"message": {"role": "assistant", "content": None,
+                                                  "images": [{"type": "image_url",
+                                                              "image_url": {"url": IMG}}]}}]})
 
 
 def main():

@@ -3,7 +3,7 @@
 Contract tests for the InfinityRoleplay frozen baseline (ollama_chat.py).
 
 Stdlib unittest only -- no third-party deps. Spins up tests/stub_all.py plus
-the REAL repo app as subprocesses, with OLLAMA_HOST / HORDE_BASE / CHAT_PORT
+the REAL repo app as subprocesses, with OLLAMA_HOST / HAPUPPY_BASE / CHAT_PORT
 pointed at the stub so nothing touches the live network. Must finish in <60s.
 
 Run (from repo root):
@@ -89,8 +89,9 @@ def start_stub(port):
 def start_app(stub_port, app_port):
     env = dict(os.environ)
     env["OLLAMA_HOST"] = "http://127.0.0.1:%d" % stub_port
-    env["HORDE_BASE"] = "http://127.0.0.1:%d" % stub_port
-    env["HORDE_KEY"] = "0000000000"
+    env["HAPUPPY_BASE"] = "http://127.0.0.1:%d" % stub_port
+    env["HAPUPPY_KEY"] = "test-key-not-a-secret"
+    env["HAPUPPY_IMAGE_MODEL"] = "stub-image-model"
     env["CHAT_PORT"] = str(app_port)
     env["BROWSER"] = "true"  # keep webbrowser.open() a no-op in CI/headless
     return subprocess.Popen([sys.executable, APP], env=env, cwd=ROOT,
@@ -193,18 +194,17 @@ class ContractTest(unittest.TestCase):
         self.assertIsNotNone(done, "image job never completed: %s" % last[:200])
         self.assertTrue(done["img"])
 
-    def test_horde_payload_contract(self):
+    def test_image_provider_contract(self):
         self.post("/api/image", {"prompt": "contract probe",
-                                 "width": 512, "height": 768, "steps": 25})
-        status, body = api_get(self.stub_port, "/__stub/horde-last")
+                                 "width": 512, "height": 768})
+        status, body = api_get(self.stub_port, "/__stub/image-last")
         self.assertEqual(status, 200)
         seen = json.loads(body)
         self.assertGreaterEqual(seen.get("calls", 0), 1)
-        self.assertEqual(seen["headers"].get("apikey"), "0000000000")
-        self.assertTrue(seen["headers"].get("client-agent"))
-        self.assertIs(seen["payload"].get("nsfw"), False)
-        self.assertIs(seen["payload"].get("censor_nsfw"), True)
-        self.assertIs(seen["payload"].get("r2"), True)
+        self.assertEqual(seen["headers"].get("authorization"), "Bearer <redacted>")
+        self.assertEqual(seen["payload"].get("model"), "stub-image-model")
+        self.assertIn("IMAGE", seen["payload"].get("modalities", []))
+        self.assertGreater(seen["payload"].get("prompt_len", 0), 0)
 
     def test_image_empty_prompt_error(self):
         _, body = self.post("/api/image", {"prompt": "   "})

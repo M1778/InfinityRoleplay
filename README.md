@@ -21,7 +21,9 @@ Private, local-first AI roleplay studio. Your characters, your machine, your rul
 
 - 💬 Chat UI served locally, powered by **your own Ollama models** — no accounts, no keys, no rate limits, no cloud.
 - 🎭 Persona studio (appearance, dynamics, scene) + 🎬 Director controls (reply length, dialogue balance, pacing, hooks) compiled into the system prompt.
-- 🖼️ Scene illustration via the free **AI Horde** crowdsourced GPU network (anonymous key, $0).
+- 🖼️ Scene illustration via a hapuppy-hosted image model (default
+  `gemini-3.1-flash-image`). Needs `HAPUPPY_KEY` — put it in `.env`
+  (see below). Never commit keys.
 - 🧠 Fact-ledger memory, recall search, reply regeneration with variants, on-device TTS.
 
 ## Quick start
@@ -29,7 +31,8 @@ Private, local-first AI roleplay studio. Your characters, your machine, your rul
 ```bash
 ollama serve                      # separate terminal, if not running
 ollama pull mistral-nemo:12b      # or any chat model you like
-python3 ollama_chat.py            # stdlib only — no pip install needed
+cp .env.example .env 2>/dev/null; ${EDITOR:-nano} .env   # add HAPUPPY_KEY for images
+./start.sh                        # loads .env, runs the app (stdlib only)
 # open http://localhost:8777
 ```
 
