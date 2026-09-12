@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 *.log
 .nohup
+*.db
+*.db-shm
+*.db-wal
+data/
