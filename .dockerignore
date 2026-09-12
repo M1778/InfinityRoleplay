@@ -1,0 +1,11 @@
+# build context excludes — keep image small, never leak local state
+*.db
+*.db-*
+*.sqlite*
+*.sqlite*-journal
+*.log
+__pycache__/
+*.pyc
+.pytest_cache/
+.git/
+data/

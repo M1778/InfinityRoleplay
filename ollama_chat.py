@@ -34,6 +34,11 @@ import urllib.request
 import urllib.error
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+try:
+    import db
+    db.init()
+except Exception:
+    db = None
 
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 PORT = int(os.environ.get("CHAT_PORT", "8777"))
@@ -43,6 +48,13 @@ CLIENT_AGENT = "ollama-rp-chat/2.0"
 
 JOBS = {}
 JOBS_LOCK = threading.Lock()
+
+
+def _clean_models(val):
+    """Validate optional Horde model override: list of <=3 names, else []."""
+    if not isinstance(val, list):
+        return []
+    return [m.strip() for m in val if isinstance(m, str) and m.strip()][:3]
 
 HTML = r"""<!DOCTYPE html>
 <html lang="en">
@@ -101,18 +113,102 @@ HTML = r"""<!DOCTYPE html>
   pre.preview { white-space: pre-wrap; font-size: .8rem; color: var(--dim);
     background: #0f1115; border: 1px solid var(--line); border-radius: 10px; padding: 10px; max-height: 220px; overflow-y: auto; }
 </style>
+<style>/* c.ai-style theme overrides (appended; later rules win) */
+header.top { display: block; margin-bottom: 12px; }
+.cai-top { border: 1px solid var(--line); border-radius: 20px; padding: 14px;
+           background: color-mix(in srgb, var(--card) 88%, transparent); }
+.cai-id { display: flex; gap: 12px; align-items: center; }
+.cai-avatar { position: relative; width: 64px; height: 64px; border-radius: 50%;
+              flex: none; display: flex; align-items: center; justify-content: center;
+              font-size: 1.6rem; font-weight: 700; color: #fff;
+              background: linear-gradient(135deg, var(--acc), var(--acc2)); overflow: hidden; }
+.cai-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cai-idtxt { flex: 1; min-width: 0; }
+.cai-idtxt h1 { font-size: 1.25rem; margin: 0; letter-spacing: .3px; }
+.cai-tag { margin: 2px 0 0; font-size: .82rem; color: var(--dim);
+           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#status { font-size: .75rem; padding: 6px 12px; min-height: 0; }
+.cai-herorow { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: stretch; }
+.cai-hello { flex: 1; min-width: 180px; min-height: 52px; font-size: 1.02rem; }
+.modelbox { display: flex; gap: 8px; flex: 2; min-width: 220px; }
+body { padding-bottom: 110px; }
+nav.tabs { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+           width: min(920px, 100%); display: flex; gap: 4px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+           background: rgba(16, 19, 28, .92); backdrop-filter: blur(12px);
+           border-top: 1px solid var(--line); z-index: 50; margin: 0; max-width: none; }
+nav.tabs button { flex: 1; min-height: 56px; border-radius: 12px; font-size: .8rem;
+                  background: transparent; color: var(--dim); border: 1px solid transparent; padding: 6px 2px; }
+nav.tabs button.active { color: #fff; border-color: var(--acc); background: #1d2130; }
+.sheet-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .6); z-index: 35; }
+.sheet-backdrop[hidden] { display: none; }
+#tab-persona.active, #tab-direct.active, #tab-gallery.active, #tab-memory.active {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: min(920px, 100%); max-height: 80vh; overflow-y: auto; z-index: 40;
+  background: var(--bg); border: 1px solid var(--line); border-bottom: none;
+  border-radius: 20px 20px 0 0; padding: 18px 14px calc(90px + env(safe-area-inset-bottom));
+  box-shadow: 0 -12px 48px rgba(0, 0, 0, .55); }
+#chat { min-height: 42vh; max-height: 62vh; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px; }
+.msg { margin: 0; max-width: 88%; padding: 10px 14px; border-radius: 18px; position: relative; }
+.msg.you { align-self: flex-end; background: #1d2f45; color: #cfe6ff; border-bottom-right-radius: 6px; }
+.msg.ai { align-self: flex-start; background: #202636; border-bottom-left-radius: 6px; padding-left: 40px; }
+.msg.ai::before { content: ""; position: absolute; left: 10px; top: 12px; width: 20px; height: 20px;
+                  border-radius: 50%; background: linear-gradient(135deg, var(--acc), var(--acc2)); }
+.msg.ai.cai-typing { padding-left: 14px; }
+.msg.ai.cai-typing::before { display: none; }
+.msg.sys { align-self: center; max-width: 100%; background: #202636; font-size: .82rem; border-radius: 12px; padding: 6px 12px; }
+.cai-typing .tdot { display: inline-block; width: 8px; height: 8px; margin: 0 2px; border-radius: 50%;
+                    background: var(--dim); animation: cai-blink 1.2s infinite; }
+.cai-typing .tdot:nth-child(2) { animation-delay: .2s; } .cai-typing .tdot:nth-child(3) { animation-delay: .4s; }
+@keyframes cai-blink { 0%, 60%, 100% { opacity: .25; } 30% { opacity: 1; } }
+.cai-welcome { text-align: center; padding: 26px 12px 18px; color: var(--dim); }
+.cai-welcome-art { font-size: 2.4rem; }
+.cai-welcome-title { font-size: 1.1rem; font-weight: 700; color: var(--txt); margin: 8px 0 4px; }
+.cai-welcome-sub { font-size: .85rem; margin: 0; }
+.card.composer { position: sticky; bottom: 78px; z-index: 30; box-shadow: 0 -8px 28px rgba(0, 0, 0, .45); }
+#sceneimg { border-radius: 12px; max-height: 46vh; object-fit: cover; }
+.gal { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.gal img { aspect-ratio: 2/3; object-fit: cover; }
+.cai-autop textarea { min-height: 72px; }
+:focus-visible { outline: 2px solid var(--acc2); outline-offset: 2px; }
+input[type=text], select { min-height: 48px; }
+button.tiny { min-height: 44px; }
+.msg .md-h { font-size: 1.05em; font-weight: 700; margin: .4em 0 .2em; }
+.msg .md-li { margin: .15em 0 .15em 1.1em; list-style: disc; }
+.msg .md-code { font-family: monospace; background: #0b0d12; padding: 1px 6px; border-radius: 6px; font-size: .88em; }
+.msg .md-pre { font-family: monospace; background: #0b0d12; padding: 8px 10px; border-radius: 8px; overflow-x: auto; font-size: .85em; }
+.msg .dlg { color: #ffe9b8; font-weight: 600; }
+.msg .act { color: #b9c4d6; font-style: italic; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
 </head>
 <body>
-<header class="top">
-  <h1><span>Killua &amp; You</span> · local roleplay</h1>
-  <span id="status">checking Ollama…</span>
-  <div class="modelbox">
-    <input id="model" list="models" placeholder="model — type or pick" aria-label="Model" />
-    <datalist id="models"></datalist>
-    <button id="refresh" class="secondary tiny" type="button">↻</button>
+<header class="top cai-top">
+  <div class="cai-id">
+    <div class="cai-avatar" aria-hidden="true"><img id="caiAvatarImg" alt="" hidden /><span id="caiAvatarInit">K</span></div>
+    <div class="cai-idtxt">
+      <h1 id="caiName">Killua</h1>
+      <p class="cai-tag" id="caiTag">local roleplay · private &amp; free</p>
+    </div>
+    <span id="status" role="status">checking Ollama…</span>
+  </div>
+  <div class="cai-herorow">
+    <button id="caiHello" class="cai-hello" type="button">👋 Say hello</button>
+    <div class="modelbox">
+      <input id="model" list="models" placeholder="model — type or pick" aria-label="Model" />
+      <datalist id="models"></datalist>
+      <button id="refresh" class="secondary tiny" type="button" aria-label="Refresh models">↻</button>
+    </div>
   </div>
 </header>
+<div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
 
+<div id="agegate" class="card" role="dialog" aria-modal="true" aria-labelledby="agegate_t">
+  <div id="agegate_t"><b>🔞 Adults only (18+)</b> — confirm to unlock chat.</div>
+  <div class="msg sys">InfinityRoleplay is for adults 18+. All characters must be 18+.</div>
+  <div class="row"><button id="age_yes" type="button">I am 18+ — enter</button><button id="age_no" class="secondary tiny" type="button">Not 18 — keep locked</button></div>
+</div>
 <nav class="tabs">
   <button data-tab="chat" class="active" type="button">💬 Chat</button>
   <button data-tab="persona" type="button">🎭 Persona</button>
@@ -130,8 +226,15 @@ HTML = r"""<!DOCTYPE html>
       <button id="newscene" class="secondary tiny" type="button">✨ New scene (+ auto image)</button>
     </div>
   </div>
-  <div class="card"><div id="chat" aria-live="polite"></div></div>
-  <div class="card">
+  <div class="card cai-chatcard">
+    <div class="cai-welcome" id="caiWelcome">
+      <div class="cai-welcome-art" aria-hidden="true">✦</div>
+      <p class="cai-welcome-title" id="caiWelcomeTitle">Start your story</p>
+      <p class="cai-welcome-sub">Say hello below, or shape a new character in Persona → ✨ Generate.</p>
+    </div>
+    <div id="chat" aria-live="polite" aria-label="Conversation"></div>
+  </div>
+  <div class="card composer">
     <div class="row"><textarea id="input" placeholder="Talk / act here…  Enter = send · Shift+Enter = newline · start with OOC: for out-of-character" aria-label="Your message"></textarea></div>
     <div class="row">
       <button id="send" type="button">Send</button>
@@ -166,6 +269,7 @@ HTML = r"""<!DOCTYPE html>
       <div><label for="p_name">Name</label><input id="p_name" type="text" /></div>
       <div><label for="p_age">Age (adult characters only)</label><input id="p_age" type="text" /></div>
     </div>
+    <div class="row"><label for="p_18plus" style="font-size:.8rem;color:var(--dim)"><input id="p_18plus" type="checkbox" style="width:auto" /> 18+ mode (opt-in, adults only, consensual steamy allowed — no graphic detail)</label></div>
     <label for="p_persona">Persona — 2-3 sentences: voice, values, flaw</label>
     <textarea id="p_persona"></textarea>
     <div class="grid2">
@@ -189,6 +293,14 @@ HTML = r"""<!DOCTYPE html>
       <div><label for="p_user">Your name</label><input id="p_user" type="text" value="Traveler" /></div>
       <div><label for="p_userpersona">You are (1-2 sentences)</label><input id="p_userpersona" type="text" value="A weary traveler with a mysterious past." /></div>
     </div>
+  </div>
+  <div class="card cai-autop">
+    <label for="ap_prompt">✨ Generate persona from one prompt</label>
+    <textarea id="ap_prompt" placeholder="e.g. A grizzled dwarven blacksmith, warm but stubborn, who runs a forge by the docks and owes you a debt…" aria-label="Describe a character in one prompt"></textarea>
+    <div class="row">
+      <button id="ap_btn" type="button">✨ Generate persona</button>
+    </div>
+    <div class="stats" id="ap_msg" aria-live="polite"></div>
   </div>
 </section>
 
@@ -215,6 +327,8 @@ HTML = r"""<!DOCTYPE html>
         </select></div>
       <div><label for="d_hook">Ending hook</label>
         <select id="d_hook"><option value="on" selected>Hook on (question / choice / move)</option><option value="off">Hook off (clean image)</option></select></div>
+      <div><label for="d_style">Response style</label>
+        <select id="d_style"><option value="modern" selected>✨ Modern (markdown, quoteless dialogue — c.ai-like)</option><option value="classic">📜 Classic RP ("quotes" + *actions*)</option></select></div>
     </div>
     <label for="d_temp">Temperature (auto-suggested per length — you can override): <span id="tempval">0.75</span></label>
     <input id="d_temp" type="range" min="0" max="1.5" step="0.05" value="0.75" />
@@ -237,6 +351,13 @@ HTML = r"""<!DOCTYPE html>
       <option value="cinematic photo, shallow depth of field, neon and rain">Cinematic</option>
       <option value="soft watercolor illustration, gentle washes, dreamy">Watercolor</option>
     </select>
+    <label>Horde model — pick up to 3, or leave Auto (SFW best)</label>
+    <div id="hordemodels" class="stats">loading Horde models…</div>
+    <div id="kudos" class="stats"></div>
+    <div class="row">
+      <button id="compare" class="secondary tiny" type="button">⚔ Compare</button>
+    </div>
+    <div class="gal" id="cmp" style="margin-top:10px"></div>
     <div class="gal" id="gal" style="margin-top:10px"></div>
   </div>
 </section>
@@ -309,6 +430,18 @@ const PRESETS = {
     user: "Pilot", userpersona: "A scavenger pilot looking for parts — or something more." }
 };
 const FIELDS = ["name","age","persona","hair","eyes","build","outfit","extra","scene","user","userpersona"];
+const HARD_BANS = ["minors", "non-consent", "incest", "real people", "self-harm erotica"];
+function BOUNDARIES_SFW(n) { return "Write only " + n + "'s words and actions. Lines starting with OOC: are player instruction — reply briefly in plain text, then resume. Keep attraction playful and non-explicit (fade to black; no graphic content)."; }
+function BOUNDARIES_18(n) { return "Write only " + n + "'s words and actions. Lines starting with OOC: are player instruction — reply briefly in plain text, then resume. All characters are consenting adults 18+. Consensual adult romantic/steamy themes allowed; no graphic sexual detail (fade to black). Never include: minors, non-consent, incest, real people, or self-harm erotica."; }
+function parseCharAge(s) { const m = String(s || "").match(/^\s*(\d{1,3})/); return m ? parseInt(m[1], 10) : null; }
+function is18plusOn() { return !!($("p_18plus") && $("p_18plus").checked); }
+function validateCharAge() {
+  const raw = $("p_age").value, n = parseCharAge(raw);
+  if (n !== null && n < 18) return { ok: false, msg: "Blocked: character age " + n + " is under 18. Adults only — set 18+." };
+  if (is18plusOn() && n === null) return { ok: false, msg: "Blocked: 18+ mode needs a parseable adult age (e.g. 18)." };
+  if (n === null && !is18plusOn()) return { ok: true, warn: "Warning: character age is unparseable (" + (raw || "blank") + "). SFW mode continues, but set an adult age." };
+  return { ok: true };
+}
 function readPersona() {
   const p = {};
   FIELDS.forEach((f) => { p[f] = $("p_" + f).value; });
@@ -327,7 +460,9 @@ function syncLabels() {
 }
 ["p_switch","p_warm","p_bold"].forEach((id) => { $(id).oninput = () => { syncLabels(); updatePreview(); persist(); }; });
 FIELDS.forEach((f) => { $("p_" + f).oninput = () => { updatePreview(); persist(); }; });
-$("preset").onchange = () => { writePersona(PRESETS[$("preset").value]); updatePreview(); persist(); };
+$("preset").onchange = () => { writePersona(PRESETS[$("preset").value]); if ($("p_18plus")) $("p_18plus").checked = false; updatePreview(); persist(); caiSyncHero(); };
+$("p_age").addEventListener("change", () => { const v = validateCharAge(); if (!v.ok) addMsg("sys", v.msg); else if (v.warn) addMsg("sys", v.warn); updatePreview(); });
+$("p_18plus").onchange = () => { if (is18plusOn() && (!isAgeOk() || !(parseCharAge($("p_age").value) >= 18))) { $("p_18plus").checked = false; addMsg("sys", "Blocked: 18+ mode needs 18+ gate + adult age 18+."); } updatePreview(); persist(); };
 
 // ---------- director: response-directive mapping (injected as sentences) ----------
 const LEN = {
@@ -351,10 +486,21 @@ $("d_len").onchange = () => {
   if (!tempTouched) { $("d_temp").value = LEN[$("d_len").value].temp; $("tempval").textContent = $("d_temp").value; }
   updatePreview(); persist();
 };
-["d_bal","d_pace","d_hook","d_mode"].forEach((id) => { $(id).onchange = () => { updatePreview(); persist(); }; });
+["d_bal","d_pace","d_hook","d_mode","d_style"].forEach((id) => { $(id).onchange = () => { updatePreview(); persist(); }; });
 $("d_custom").oninput = () => { updatePreview(); persist(); };
 $("d_think").onchange = persist;
 
+function styleFormat(p) {
+  if (($("d_style") && $("d_style").value) === "classic")
+    return "Show speech as \"spoken words\". Show body, movement and senses as *action*. Write actions toward " + p.user + " in present tense. 1 idea per paragraph.";
+  return "Use markdown. Write dialogue as plain text with NO quotation marks. Wrap actions, feelings and narration in *single asterisks* (renders italic). Use **bold** sparingly for emphasis. Never narrate " + p.user + ". 1 idea per paragraph.";
+}
+function styleExample(p) {
+  const u = p.user, n = p.name;
+  if (($("d_style") && $("d_style").value) === "classic")
+    return "STYLE EXAMPLE (copy this exact shape):\n" + n + ": *ears perking as the bell chimes* \"Well well… look what the rain dragged in. Come to share that secret, or just my fire?\"\n" + u + ": *slides into the booth, setting the sealed letter down* \"Both. This seal — have you seen it before?\"\n" + n + ": *fingers stilling on the letter, grin faltering* \"…Where did you get that?\"";
+  return "STYLE EXAMPLE (copy this exact shape — markdown, no quote marks on dialogue):\n" + n + ": *ears perking as the bell chimes* Well well… look what the rain dragged in. Come to share that secret — or just my fire?\n" + u + ": *slides into the booth, setting the sealed letter down* Both. This seal — have you seen it before?\n" + n + ": *fingers stilling on the letter, grin faltering for half a second* …Where did you get that?";
+}
 function switchText(v) {
   return v < 35 ? "leans submissive: yields sweetly, asks permission, melts at praise" :
          v > 65 ? "leans dominant: takes charge, gives playful orders, pins with a grin" :
@@ -374,9 +520,10 @@ function composeSystem() {
     "\nVIBE: Warm " + p.warm + ", Bold " + p.bold + ". Dynamic with " + p.user + ": " + switchText(p.switchv) + ".\n\n" +
     "SCENE NOW: " + p.scene + "\n" + p.user + " IS: " + p.userpersona + "\n\n" +
     "RESPONSE SHAPE: " + shape + "\n\n" +
-    "FORMATTING: Show speech as \"spoken words\". Show body, movement and senses as *action*. Write actions toward " + p.user + " in present tense. 1 idea per paragraph.\n\n" +
+    "FORMATTING: " + styleFormat(p) + "\n\n" +
+    styleExample(p) + "\n\n" +
     "CONTINUITY: Treat STORY SO FAR and SCENE NOW as truth. Continue only from " + p.user + "'s last message. Add 1 new concrete detail per reply. Keep time, place and injuries consistent.\n\n" +
-    "BOUNDARIES: Write only " + p.name + "'s words and actions. Lines starting with OOC: are player instruction — reply briefly in plain text, then resume. Keep attraction playful and non-explicit (fade to black; no graphic content).\n\n" +
+    "BOUNDARIES: " + ((is18plusOn() && isAgeOk() && parseCharAge(p.age) !== null && parseCharAge(p.age) >= 18) ? BOUNDARIES_18(p.name) : BOUNDARIES_SFW(p.name)) + "\n\n" +
     (memory ? "STORY SO FAR: " + memory + "\n\n" : "") +
     (buildMemoryBlock() ? "MEMORY FACTS (treat as ground truth; do not contradict; newest last):\n" + buildMemoryBlock() + "\n\n" : "") +
     "You are " + p.name + ". Reply now in the RESPONSE SHAPE above.";
@@ -398,9 +545,10 @@ document.querySelectorAll("nav.tabs button").forEach((b) => {
 function persist() {
   store.save("persona", readPersona());
   store.save("direct", { len: $("d_len").value, bal: $("d_bal").value, pace: $("d_pace").value,
-    hook: $("d_hook").value, temp: $("d_temp").value, think: $("d_think").checked,
+    hook: $("d_hook").value, temp: $("d_temp").value, think: $("d_think").checked, e18: is18plusOn(),
     mode: $("d_mode").value, custom: $("d_custom").value, model: $("model").value,
     style: $("imgstyle").value, preset: $("preset").value,
+    hordeModels: selectedHordeModels(), rstyle: $("d_style").value,
     ttsvoice: $("ttsvoice").value, ttsauto: $("ttsauto").checked,
     ttsrate: $("ttsrate").value, ttspitch: $("ttspitch").value });
 }
@@ -416,6 +564,9 @@ function restore() {
     if (d.ttsrate) { $("ttsrate").value = d.ttsrate; $("ttsrateval").textContent = d.ttsrate; }
     if (d.ttspitch) { $("ttspitch").value = d.ttspitch; $("ttspitchval").textContent = d.ttspitch; }
     $("model").value = d.model || ""; if (d.style) $("imgstyle").value = d.style;
+    if (d.e18 && isAgeOk() && parseCharAge($("p_age").value) >= 18) $("p_18plus").checked = true;
+    if (d.rstyle) $("d_style").value = d.rstyle;
+    pendingHordeModels = d.hordeModels || [];
   }
   const g = store.load("gallery", []);
   g.forEach((it) => addGalImg(it.img, it.cap, true));
@@ -437,6 +588,27 @@ function addMsg(who, text) {
 function stripThink(t) {
   return t.replace(/<think>[\s\S]*?(<\/think>|$)/gi, "").replace(/<thinking>[\s\S]*?(<\/thinking>|$)/gi, "").trim();
 }
+// RP-aware markdown: escape HTML, then **bold**, *single*->action italic,
+// "quotes"->dialogue highlight, `code`, ```blocks, headers, dash-lists.
+function escHtml(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function mdInline(x) {
+  return x.replace(/`([^`\n]+)`/g, '<span class="md-code">$1</span>')
+    .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<span class="act">$2</span>')
+    .replace(/"([^"\n]+)"/g, '<span class="dlg">"$1"</span>');
+}
+function mdRender(src) {
+  const pres = [];
+  const s = escHtml(src).replace(/```([\s\S]*?)```/g, (m, c) => { pres.push(c); return "\0PRE" + (pres.length - 1) + "\0"; });
+  const out = s.split("\n").map((line) => {
+    let m;
+    if ((m = line.match(/^(#{1,3})\s+(.*)$/))) return '<div class="md-h">' + mdInline(m[2]) + "</div>";
+    if ((m = line.match(/^\s*[-–]\s+(.*)$/))) return '<div class="md-li">' + mdInline(m[1]) + "</div>";
+    if (/^\s*$/.test(line)) return "<br>";
+    return mdInline(line) + "<br>";
+  }).join("");
+  return out.replace(/\0PRE(\d+)\0/g, (m, i) => '<pre class="md-pre">' + pres[+i] + "</pre>");
+}
 async function loadModels() {
   const st = $("status");
   try {
@@ -454,6 +626,9 @@ $("refresh").onclick = loadModels;
 
 async function send(text, opts) {
   opts = opts || {};
+  if (!isAgeOk()) { addMsg("sys", "Blocked: confirm 18+ first (button above the tabs)."); return; }
+  const vc = validateCharAge(); if (!vc.ok) { addMsg("sys", vc.msg); return; } if (vc.warn) addMsg("sys", vc.warn);
+  if (is18plusOn() && !(parseCharAge($("p_age").value) >= 18)) { addMsg("sys", "Blocked: 18+ mode needs age-gate + age 18+."); return; }
   const model = $("model").value.trim();
   if (!model) { addMsg("sys", "Pick or type a model name first."); return; }
   charName = $("p_name").value.trim() || "Killua";
@@ -509,9 +684,10 @@ async function send(text, opts) {
     }
     full = stripThink(full);
     if (el) {
-      el.childNodes.forEach((n) => { if (n.nodeType === 3) el.removeChild(n); });
-      el.insertAdjacentText("afterbegin", charName + ": " + full);
-      if (thinkEl && !thinkTxt.trim()) thinkEl.remove();
+      el.dataset.raw = full;
+      el.innerHTML = mdRender(charName + ": " + full);
+      if (thinkEl && thinkTxt.trim()) el.appendChild(thinkEl);
+      tagAiButtons();
     }
     history.push({ role: "assistant", content: full });
     while (history.length > 1 + 20) history.splice(1, 2); // keep last 10 turns + system
@@ -548,8 +724,17 @@ $("input").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("send").click(); }
 });
 $("stop").onclick = () => { ttsStop(); if (aborter) aborter.abort(); };
+function exportPersona() {
+  const p = readPersona(), e18 = is18plusOn();
+  const out = Object.assign({}, p, { safety: { age_gate: isAgeOk(), adult_only_18plus: e18,
+    note: e18 ? "18+ — consensual adult themes; bans: minors, non-consent, incest, real people, self-harm erotica" : "SFW — non-explicit" } });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: "application/json" }));
+  a.download = "persona-" + (p.name || "char").toLowerCase().replace(/\s+/g, "_") + (e18 ? "-18plus" : "") + ".json";
+  a.click();
+}
 $("save").onclick = () => {
-  let md = "# Roleplay with " + charName + "\n\n";
+  let md = (is18plusOn() ? "> 🔞 18+ — consensual adult themes.\n\n" : "") + "# Roleplay with " + charName + "\n\n";
   history.forEach((m) => { md += (m.role === "system" ? "## System\n" : m.role === "user" ? "**You:**\n" : "**" + charName + ":**\n") + m.content + "\n\n"; });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
@@ -598,7 +783,7 @@ async function requestImage(prompt, caption) {
   addMsg("sys", "🎨 painting the scene… (free Horde GPU, usually under a minute)");
   try {
     const r = await fetch("/api/image", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: prompt + " ### " + NEG, width: 512, height: 768, steps: 25 }) });
+      body: JSON.stringify({ prompt: prompt + " ### " + NEG, width: 512, height: 768, steps: 25, models: selectedHordeModels() }) });
     const j = await r.json();
     if (j.error) throw new Error(j.error);
     pollImage(j.job, caption);
@@ -630,6 +815,114 @@ function addGalImg(src, cap, skipStore) {
     const arr = store.load("gallery", []); arr.unshift({ img: src, cap }); store.save("gallery", arr.slice(0, 30));
   }
 }
+// ---------- Horde model catalog + compare (max 3, SFW only) ----------
+let hordeModels = [];
+let pendingHordeModels = [];
+function selectedHordeModels() {
+  const out = [];
+  document.querySelectorAll('#hordemodels input[type=checkbox][data-model]:checked').forEach((c) => {
+    if (c.value !== "__auto") out.push(c.value);
+  });
+  return out.slice(0, 3);
+}
+function syncHordeChecks(changed) {
+  const auto = document.querySelector('#hordemodels input[type=checkbox][value=__auto]');
+  if (changed && changed.value === "__auto") {
+    if (changed.checked) document.querySelectorAll('#hordemodels input[type=checkbox][data-model]:checked')
+      .forEach((c) => { if (c !== changed) c.checked = false; });
+  } else if (changed && changed.checked) {
+    if (auto) auto.checked = false;
+    if ([...document.querySelectorAll('#hordemodels input[type=checkbox][data-model]:checked')]
+      .filter((c) => c.value !== "__auto").length > 3) changed.checked = false;
+  }
+  persist();
+}
+async function loadHordeModels() {
+  const box = $("hordemodels");
+  try {
+    const r = await fetch("/api/horde/models"), j = await r.json();
+    if (j.error) throw new Error(j.error);
+    hordeModels = (j.models || []).filter((m) => !m.nsfw);
+    box.innerHTML = "";
+    const mk = (val, label, checked) => {
+      const l = document.createElement("label");
+      l.style.cssText = "display:inline-block;margin:2px 8px 2px 0;font-size:.8rem;color:var(--txt)";
+      const c = document.createElement("input");
+      c.type = "checkbox"; c.value = val; c.checked = !!checked;
+      c.setAttribute("data-model", "");
+      c.onchange = () => syncHordeChecks(c);
+      l.appendChild(c); l.appendChild(document.createTextNode(" " + label));
+      box.appendChild(l);
+    };
+    mk("__auto", "Auto (best)", pendingHordeModels.length === 0);
+    hordeModels.slice(0, 12).forEach((m) =>
+      mk(m.name, m.name + " (" + m.workers + ")", pendingHordeModels.includes(m.name)));
+    pendingHordeModels = [];
+    persist();
+  } catch (e) { box.textContent = "Horde catalog unreachable — Auto still works."; }
+  try {
+    const r = await fetch("https://stablehorde.net/api/v2/find_user",
+      { headers: { apikey: "0000000000", "Client-Agent": "ollama-rp-chat/2.0" } });
+    const j = await r.json();
+    if (j && j.kudos !== undefined) $("kudos").textContent = "Horde anon kudos: " + j.kudos;
+  } catch (e) {}
+}
+function compareModels() {
+  const last = [...history].reverse().find((m) => m.role === "assistant");
+  const base = imagePrompt(last ? last.content.slice(0, 220) : "");
+  let picked = selectedHordeModels();
+  if (!picked.length) picked = hordeModels.filter((m) => !m.nsfw).slice(0, 3).map((m) => m.name);
+  if (!picked.length) { addMsg("sys", "Horde catalog still loading — try again in a few seconds."); return; }
+  const cmp = $("cmp"); cmp.innerHTML = "";
+  picked.forEach((m) => {
+    const f = document.createElement("figure");
+    const im = document.createElement("img"); im.alt = "compare render";
+    im.style.cssText = "width:100%;min-height:120px;background:#0f1115";
+    const c = document.createElement("figcaption");
+    const w = (hordeModels.find((x) => x.name === m) || {}).workers;
+    c.textContent = m + (w !== undefined ? " (" + w + " workers)" : "") + " — queued…";
+    const btn = document.createElement("button");
+    btn.className = "secondary tiny"; btn.type = "button"; btn.textContent = "Set as scene";
+    btn.disabled = true;
+    btn.onclick = () => {
+      if (!im.src) return;
+      $("sceneimg").src = im.src; $("sceneimg").style.display = "block";
+      $("scenecap").textContent = "Compare pick — " + m;
+      addGalImg(im.src, "Compare pick — " + m);
+    };
+    f.appendChild(im); f.appendChild(c); f.appendChild(btn); cmp.appendChild(f);
+    requestCompare(base, m, im, c, btn);
+  });
+  persist();
+}
+async function requestCompare(prompt, model, im, cap, btn) {
+  try {
+    const r = await fetch("/api/image", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: prompt + " ### " + NEG, width: 512, height: 768, steps: 25, models: [model] }) });
+    const j = await r.json();
+    if (j.error) throw new Error(j.error);
+    pollCompare(j.job, model, im, cap, btn);
+  } catch (e) { cap.textContent = model + " — failed: " + e.message; }
+}
+async function pollCompare(job, model, im, cap, btn) {
+  for (let i = 0; i < 90; i++) {
+    await new Promise((r) => setTimeout(r, 4000));
+    try {
+      const r = await fetch("/api/image/" + job), j = await r.json();
+      if (j.error) { cap.textContent = model + " — failed: " + j.error; return; }
+      if (j.done && j.img) {
+        im.src = j.img;
+        const w = (hordeModels.find((x) => x.name === model) || {}).workers;
+        cap.textContent = model + (w !== undefined ? " (" + w + " workers)" : "") + " — done";
+        btn.disabled = false;
+        return;
+      }
+      cap.textContent = model + " — queue #" + (j.queue_position ?? "?") + " (~" + (j.wait_time ?? "?") + "s)…";
+    } catch (e) {}
+  }
+  cap.textContent = model + " — timed out, retry later.";
+}
+$("compare").onclick = compareModels;
 $("illustrate").onclick = () => {
   const last = [...history].reverse().find((m) => m.role === "assistant");
   requestImage(imagePrompt(last ? last.content.slice(0, 220) : ""), "Illustrated moment — " + new Date().toLocaleTimeString());
@@ -783,7 +1076,7 @@ function pinQuote(t) {
 chat.addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   const div = e.target.closest(".msg.ai"); if (!div) return;
-  const raw = (div.firstChild && div.firstChild.textContent ? div.firstChild.textContent : "").replace(/^.*?:\s*/, "").slice(0, 400);
+  const raw = (div.dataset.raw !== undefined ? div.dataset.raw : ((div.firstChild && div.firstChild.textContent) || div.textContent || "")).replace(/^.*?:\s*/, "").slice(0, 400);
   if (b.hasAttribute("data-pin")) pinQuote(raw);
   if (b.hasAttribute("data-say")) ttsSpeak(raw);
 });
@@ -812,10 +1105,7 @@ function showVariant(i) {
   vIdx = (i + variants.length) % variants.length;
   history[history.length - 1].content = variants[vIdx];
   const els = chat.querySelectorAll(".msg.ai"), el = els[els.length - 1];
-  if (el) {
-    el.childNodes.forEach((n) => { if (n.nodeType === 3) el.removeChild(n); });
-    el.insertAdjacentText("afterbegin", charName + ": " + variants[vIdx]);
-  }
+  if (el) { el.dataset.raw = variants[vIdx]; el.innerHTML = mdRender(charName + ": " + variants[vIdx]); tagAiButtons(); }
   renderVariants();
 }
 async function regen() {
@@ -874,9 +1164,157 @@ $("ttsrate").oninput = () => { $("ttsrateval").textContent = $("ttsrate").value;
 $("ttspitch").oninput = () => { $("ttspitchval").textContent = $("ttspitch").value; persist(); };
 $("ttsauto").onchange = persist;
 
+// ---------- age gate (adults 18+ only) ----------
+function isAgeOk() { try { return store.load("ageok", 0) === 1; } catch (e) { return false; } }
+function applyGateLock() {
+  const ok = isAgeOk(), gate = $("agegate");
+  if (gate) gate.style.display = ok ? "none" : "block";
+  ["input", "send", "illustrate", "newscene"].forEach((id) => { const el = $(id); if (el) el.disabled = !ok; });
+  document.querySelectorAll("nav.tabs button").forEach((b) => { if (b.dataset.tab !== "chat") b.disabled = !ok; });
+  if (!ok) {
+    $("input").placeholder = "🔞 Confirm 18+ above to unlock chat.";
+    if ($("p_18plus") && $("p_18plus").checked) $("p_18plus").checked = false;
+  }
+}
+$("age_yes").onclick = () => { store.save("ageok", 1); applyGateLock(); addMsg("sys", "Age confirmed 18+. Chat unlocked."); updatePreview(); };
+$("age_no").onclick = () => { addMsg("sys", "Locked: adults 18+ only."); applyGateLock(); };
+
+// ---------- c.ai-style UI additions (additive; redefines nothing) ----------
+const AP_INSTRUCTION = "You are a character-creation assistant. The user will describe a roleplay character in one free-text prompt. Return ONLY a single JSON object, no other text, no markdown, no code fences, with EXACTLY these keys: {\"name\": string, \"age\": string, \"persona\": string (2-3 sentences: voice, values, flaw), \"hair\": string, \"eyes\": string, \"build\": string, \"outfit\": string, \"extra\": string, \"switchv\": number 0-100 (0 = submissive, 100 = dominant), \"warm\": number 0-100, \"bold\": number 0-100, \"scene\": string (2-3 sentences: where, when, who is present, the spark), \"user\": string (the user's name, default \"Traveler\"), \"userpersona\": string (1-2 sentences)}. Rules: every character is an adult aged 18 or older — if the description suggests a minor, age the character up to 18+ and note it in \"persona\"; if the user describes an adult dynamic, keep the adult framing; keep attraction playful and non-explicit; never leave a key empty, invent a sensible default instead; switchv, warm and bold must be integers 0-100; scene must work as-is as an opening scene. User prompt:";
+function apParse(raw) {
+  const out = {};
+  const m = (raw || "").match(/\{[\s\S]*\}/);
+  let obj = null;
+  if (m) { try { obj = JSON.parse(m[0]); } catch (e) { obj = null; } }
+  if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+    ["name", "age", "persona", "hair", "eyes", "build", "outfit", "extra", "scene", "user", "userpersona"].forEach((k) => {
+      if (obj[k] != null && String(obj[k]).trim() !== "") out[k] = String(obj[k]).slice(0, 600);
+    });
+    ["switchv", "warm", "bold"].forEach((k) => {
+      const n = parseInt(obj[k], 10);
+      if (!isNaN(n)) out[k] = Math.max(0, Math.min(100, n));
+    });
+  } else {
+    ["name", "age", "persona", "hair", "eyes", "build", "outfit", "extra", "scene", "user", "userpersona"].forEach((k) => {
+      const mm = (raw || "").match(new RegExp('"' + k + '"\\s*:\\s*"([^"]*)"', "i"));
+      if (mm && mm[1].trim() !== "") out[k] = mm[1].slice(0, 600);
+    });
+    ["switchv", "warm", "bold"].forEach((k) => {
+      const mm = (raw || "").match(new RegExp('"' + k + '"\\s*:\\s*(\\d+)', "i"));
+      if (mm) out[k] = Math.max(0, Math.min(100, parseInt(mm[1], 10)));
+    });
+  }
+  return out;
+}
+function apFill(d) {
+  const map = { name: "p_name", age: "p_age", persona: "p_persona", hair: "p_hair", eyes: "p_eyes", build: "p_build", outfit: "p_outfit", extra: "p_extra", scene: "p_scene", user: "p_user", userpersona: "p_userpersona" };
+  Object.keys(map).forEach((k) => { if (d[k] != null && d[k] !== "") $(map[k]).value = d[k]; });
+  if (d.switchv != null) $("p_switch").value = d.switchv;
+  if (d.warm != null) $("p_warm").value = d.warm;
+  if (d.bold != null) $("p_bold").value = d.bold;
+  syncLabels(); updatePreview(); persist(); caiSyncHero();
+}
+$("ap_btn").onclick = async () => {
+  const msg = $("ap_msg"), prompt = $("ap_prompt").value.trim();
+  const model = $("model").value.trim();
+  if (!prompt) { msg.textContent = "Describe your character first — one or two sentences is enough."; return; }
+  if (!model) { msg.textContent = "Pick a model in the header first."; return; }
+  msg.textContent = "✨ dreaming up your character…";
+  $("ap_btn").disabled = true;
+  try {
+    const r = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model, stream: false, think: false, temperature: 0.4, num_predict: 800,
+        messages: [{ role: "system", content: AP_INSTRUCTION }, { role: "user", content: prompt }] }) });
+    if (!r.ok) throw new Error("server " + r.status);
+    const j = await r.json();
+    const raw = (((j.message || {}).content) || "").trim();
+    if (!raw) throw new Error("empty reply");
+    const d = apParse(raw);
+    if (!d.name && !d.persona) { msg.textContent = "The model returned prose instead of JSON — try again, or be more specific (looks, vibe, setting)."; return; }
+    apFill(d);
+    msg.textContent = "✨ " + ($("p_name").value || "Character") + " is ready — review the fields, then say hello in Chat.";
+  } catch (e) { msg.textContent = "Couldn't generate (" + e.message + ") — is Ollama running?"; }
+  finally { $("ap_btn").disabled = false; }
+};
+function caiHash(s) { let h = 0; for (let i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) | 0; } return Math.abs(h); }
+function caiAvatarSync() {
+  const hasSrc = $("sceneimg").getAttribute("src"), shown = hasSrc && $("sceneimg").style.display !== "none";
+  const im = $("caiAvatarImg");
+  if (shown) { im.src = $("sceneimg").src; im.hidden = false; $("caiAvatarInit").style.display = "none"; }
+  else { im.hidden = true; im.removeAttribute("src"); $("caiAvatarInit").style.display = ""; }
+}
+function caiSyncHero() {
+  const name = (($("p_name") && $("p_name").value) || "Killua").trim() || "Killua";
+  $("caiName").textContent = name;
+  const per = (($("p_persona") && $("p_persona").value) || "").trim();
+  $("caiTag").textContent = per ? (per.length > 90 ? per.slice(0, 90) + "…" : per) : "local roleplay · private & free";
+  $("caiAvatarInit").textContent = (name[0] || "K").toUpperCase();
+  const wt = $("caiWelcomeTitle");
+  if (wt) wt.textContent = "Start your story with " + name;
+  document.documentElement.style.setProperty("--acc", "hsl(" + (caiHash(name.toLowerCase()) % 360) + " 65% 62%)");
+  caiAvatarSync();
+}
+["p_name", "p_persona"].forEach((id) => { $(id).addEventListener("input", caiSyncHero); });
+new MutationObserver(caiAvatarSync).observe($("sceneimg"), { attributes: true, attributeFilter: ["src", "style"] });
+document.querySelectorAll("nav.tabs button").forEach((b) => {
+  b.addEventListener("click", () => {
+    const sheet = b.dataset.tab !== "chat";
+    $("sheetBackdrop").hidden = !sheet;
+  });
+});
+$("sheetBackdrop").addEventListener("click", () => {
+  document.querySelector('nav.tabs button[data-tab="chat"]').click();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("sheetBackdrop").hidden) {
+    document.querySelector('nav.tabs button[data-tab="chat"]').click();
+  }
+});
+let caiTypingEl = null;
+function caiHideTyping() { if (caiTypingEl) { caiTypingEl.remove(); caiTypingEl = null; } }
+function caiObserveChat() {
+  const box = $("chat");
+  new MutationObserver(() => {
+    const w = $("caiWelcome");
+    if (w) w.style.display = box.querySelector(".msg") ? "none" : "";
+    const msgs = box.querySelectorAll(".msg.ai:not(.cai-typing)");
+    const last = msgs[msgs.length - 1];
+    if (last && $("send").disabled) {
+      const raw = last.dataset.raw !== undefined ? last.dataset.raw : ((last.firstChild && last.firstChild.textContent) || last.textContent || "");
+      const t = raw.replace(/^.*?:\s*/, "").trim();
+      if (!t) {
+        if (!caiTypingEl) {
+          caiTypingEl = document.createElement("div");
+          caiTypingEl.className = "msg ai cai-typing";
+          caiTypingEl.setAttribute("aria-hidden", "true");
+          caiTypingEl.innerHTML = '<span class="tdot"></span><span class="tdot"></span><span class="tdot"></span>';
+          box.appendChild(caiTypingEl); box.scrollTop = box.scrollHeight;
+        }
+      } else caiHideTyping();
+    } else caiHideTyping();
+  }).observe(box, { childList: true, subtree: true, characterData: true });
+  $("stop").addEventListener("click", caiHideTyping);
+}
+function caiGreet() {
+  document.querySelector('nav.tabs button[data-tab="chat"]').click();
+  if ($("send").disabled) return;
+  if (!$("model").value.trim()) { $("input").focus(); return; }
+  send("Hello!");
+}
+$("caiHello").onclick = () => {
+  if (chat.querySelector(".msg.you")) $("input").focus();
+  else caiGreet();
+};
+$("newscene").addEventListener("click", () => {
+  setTimeout(() => {
+    if (!chat.querySelector(".msg.you") && !$("send").disabled && $("model").value.trim()) send("Hello!");
+  }, 400);
+});
+caiObserveChat(); caiSyncHero();
+
 // ---------- boot ----------
 facts = store.load("facts", []); renderFacts();
-restore(); syncLabels(); updatePreview(); loadModels(); populateVoices(); renderVariants();
+restore(); syncLabels(); updatePreview(); loadModels(); populateVoices(); renderVariants(); loadHordeModels(); applyGateLock();
 </script>
 </body>
 </html>"""
@@ -930,6 +1368,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, json.dumps({"models": names}).encode())
             except Exception as e:
                 self._send(200, json.dumps({"error": str(e)}).encode())
+        elif self.path == "/api/horde/models":
+            try:
+                import horde_catalog  # local import: startup stays safe w/o it
+                self._send(200, json.dumps(
+                    {"models": horde_catalog.list_image_models()}).encode())
+            except Exception as e:
+                self._send(200, json.dumps({"error": str(e)[:200]}).encode())
+            return
         elif self.path.startswith("/api/image/"):
             job = self.path.rsplit("/", 1)[-1]
             with JOBS_LOCK:
@@ -1049,9 +1495,10 @@ class Handler(BaseHTTPRequestHandler):
                         "sampler_name": "k_euler_a",
                         "karras": True,
                         "n": 1},
+                    # SAFETY INVARIANT: Horde stays SFW even in 18+ mode (anonymous workers + ToS).
                     "nsfw": False,
                     "censor_nsfw": True,
-                    "models": [],
+                    "models": _clean_models(req.get("models")),
                     "r2": True,
                 }
                 resp = self._horde("POST", "/generate/async", payload, timeout=30)
@@ -1066,11 +1513,39 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._send(200, json.dumps({"error": str(e)[:300]}).encode())
             return
+        if self.path == "/api/db":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                req = json.loads(self.rfile.read(length) or b"{}")
+                a, p = req.get("action", ""), req.get("payload", {}) or {}
+                if db is None:
+                    raise RuntimeError("server persistence unavailable (db.py missing?)")
+                F = {"character.save": lambda: db.save_character(p.get("id"), p.get("name", ""), p.get("data", {})),
+                     "character.load": lambda: db.load_character(p.get("id")),
+                     "character.list": lambda: db.list_characters(),
+                     "chat.save": lambda: db.save_chat(p.get("id"), p.get("character_id", ""), p.get("title", ""), p.get("messages", [])),
+                     "chat.load": lambda: db.load_chat(p.get("id")),
+                     "chat.list": lambda: db.list_chats(p.get("character_id")),
+                     "fact.add": lambda: db.add_facts(p.get("character_id", ""), p.get("items") or ([{"cat": p.get("cat"), "text": p.get("text")}] if p.get("text") else [])),
+                     "fact.list": lambda: db.list_facts(p.get("character_id", "")),
+                     "fact.del": lambda: (db.del_fact(p.get("id")), True)[1],
+                     "image.add": lambda: db.add_image(p.get("character_id", ""), p.get("url", p.get("img", "")), p.get("caption", p.get("cap", ""))),
+                     "image.list": lambda: db.list_images(p.get("character_id", "")),
+                     "kv.get": lambda: db.kv_get(p.get("key", ""), p.get("default")),
+                     "kv.set": lambda: (db.kv_set(p.get("key", ""), p.get("value", "")), True)[1],
+                     "backup.export": lambda: db.export_json(),
+                     "backup.import": lambda: (db.import_json(p.get("backup", {})), True)[1]}[a]()
+                self._send(200, json.dumps({"ok": True, "result": F}).encode())
+            except KeyError:
+                self._send(400, json.dumps({"error": "unknown action"}).encode())
+            except Exception as e:
+                self._send(200, json.dumps({"error": str(e)[:300]}).encode())
+            return
         self._send(404, b'{"error":"not found"}')
 
 
 def main():
-    srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    srv = ThreadingHTTPServer((os.environ.get("HOST", "127.0.0.1"), PORT), Handler)
     print(f"Roleplay chat v2 at  http://localhost:{PORT}")
     print(f"Ollama: {OLLAMA} | Horde: {HORDE} (anon key)")
     try:

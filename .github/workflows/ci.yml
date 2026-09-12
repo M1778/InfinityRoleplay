@@ -1,0 +1,27 @@
+name: contract
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Compile all Python
+        run: python3 -m compileall -q .
+      - name: Check inline UI JS
+        run: |
+          python3 -c "import re;html=open('ollama_chat.py',encoding='utf-8').read();m=re.search(r'<script>(.*?)</script>',html,re.S);open('/tmp/app_inline.js','w').write(m.group(1))"
+          node --check /tmp/app_inline.js
+      - name: Contract tests (stubbed, no network)
+        run: python3 tests/test_contract.py
+      - name: API fuzz (malformed inputs)
+        run: python3 tests/fuzz_api.py
