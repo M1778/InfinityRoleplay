@@ -201,7 +201,7 @@ body {
   max-width: 960px; color: var(--txt);
 }
 h1, .cai-welcome-title { text-wrap: balance; }
-.stats, #kudos, .gal figcaption { font-variant-numeric: tabular-nums; }
+.stats, .gal figcaption { font-variant-numeric: tabular-nums; }
 /* hero */
 .cai-top { background: linear-gradient(180deg, var(--card2), var(--card)); box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
 .cai-avatar { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px color-mix(in srgb, var(--acc) 65%, transparent), 0 6px 18px rgba(0, 0, 0, .5); }
@@ -256,8 +256,6 @@ nav.tabs button.active::after { content: ""; position: absolute; left: 30%; righ
 .galdel { position: absolute; top: 6px; right: 6px; min-height: 36px; padding: 4px 10px; font-size: .75rem;
           background: rgba(10, 12, 17, .8); }
 pre.preview { font-size: .78rem; line-height: 1.5; }
-#agegate { border-color: var(--warm); }
-#agegate_t { text-wrap: balance; }
 /* scrollbars */
 #chat::-webkit-scrollbar, pre.preview::-webkit-scrollbar { width: 10px; }
 #chat::-webkit-scrollbar-thumb, pre.preview::-webkit-scrollbar-thumb { background: #2a3040; border-radius: 5px; }
@@ -287,11 +285,6 @@ pre.preview { font-size: .78rem; line-height: 1.5; }
 </header>
 <div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
 
-<div id="agegate" class="card" role="dialog" aria-modal="true" aria-labelledby="agegate_t">
-  <div id="agegate_t"><b>🔞 Adults only (18+)</b> — confirm to unlock chat.</div>
-  <div class="msg sys">InfinityRoleplay is for adults 18+. All characters must be 18+.</div>
-  <div class="row"><button id="age_yes" type="button">I am 18+ — enter</button><button id="age_no" class="secondary tiny" type="button">Not 18 — keep locked</button></div>
-</div>
 <nav class="tabs">
   <button data-tab="chat" class="active" type="button">💬 Chat</button>
   <button data-tab="persona" type="button">🎭 Persona</button>
@@ -352,7 +345,6 @@ pre.preview { font-size: .78rem; line-height: 1.5; }
       <div><label for="p_name">Name</label><input id="p_name" type="text" /></div>
       <div><label for="p_age">Age (adult characters only)</label><input id="p_age" type="text" /></div>
     </div>
-    <div class="row"><label for="p_18plus" style="font-size:.8rem;color:var(--dim)"><input id="p_18plus" type="checkbox" style="width:auto" /> 18+ mode (opt-in, adults only, consensual steamy allowed — no graphic detail)</label></div>
     <label for="p_persona">Persona — 2-3 sentences: voice, values, flaw</label>
     <textarea id="p_persona"></textarea>
     <div class="grid2">
@@ -515,17 +507,8 @@ const PRESETS = {
 };
 const FIELDS = ["name","age","persona","hair","eyes","build","outfit","extra","vibe","scene","user","userpersona"];
 const HARD_BANS = ["minors", "non-consent", "incest", "real people", "self-harm erotica"];
-function BOUNDARIES_SFW(n) { return "Write only " + n + "'s words and actions. Lines starting with OOC: are player instruction — reply briefly in plain text, then resume. Keep attraction playful and non-explicit (fade to black; no graphic content)."; }
-function BOUNDARIES_18(n) { return "Write only " + n + "'s words and actions. Lines starting with OOC: are player instruction — reply briefly in plain text, then resume. All characters are consenting adults 18+. Consensual adult romantic/steamy themes allowed; no graphic sexual detail (fade to black). Never include: minors, non-consent, incest, real people, or self-harm erotica."; }
-function parseCharAge(s) { const m = String(s || "").match(/^\s*(\d{1,3})/); return m ? parseInt(m[1], 10) : null; }
-function is18plusOn() { return !!($("p_18plus") && $("p_18plus").checked); }
-function validateCharAge() {
-  const raw = $("p_age").value, n = parseCharAge(raw);
-  if (n !== null && n < 18) return { ok: false, msg: "Blocked: character age " + n + " is under 18. Adults only — set 18+." };
-  if (is18plusOn() && n === null) return { ok: false, msg: "Blocked: 18+ mode needs a parseable adult age (e.g. 18)." };
-  if (n === null && !is18plusOn()) return { ok: true, warn: "Warning: character age is unparseable (" + (raw || "blank") + "). SFW mode continues, but set an adult age." };
-  return { ok: true };
-}
+// Baseline character boundaries (prompt-level; the project's age policy lives in README.md).
+function BOUNDARIES(n) { return "Write only " + n + "'s words and actions. Lines starting with OOC: are player instruction — reply briefly in plain text, then resume. Keep attraction playful and non-explicit (fade to black; no graphic content). Never include: " + HARD_BANS.join(", ") + "."; }
 function readPersona() {
   const p = {};
   FIELDS.forEach((f) => { p[f] = $("p_" + f).value; });
@@ -544,9 +527,7 @@ function writePersona(p) {
 /* syncLabels removed with the sliders */
 /* vibe sliders removed: dynamic lives in the prompt as prose (p_vibe) */
 FIELDS.forEach((f) => { $("p_" + f).oninput = () => { updatePreview(); persist(); }; });
-$("preset").onchange = () => { writePersona(PRESETS[$("preset").value]); if ($("p_18plus")) $("p_18plus").checked = false; updatePreview(); persist(); caiSyncHero(); };
-$("p_age").addEventListener("change", () => { const v = validateCharAge(); if (!v.ok) addMsg("sys", v.msg); else if (v.warn) addMsg("sys", v.warn); updatePreview(); });
-$("p_18plus").onchange = () => { if (is18plusOn() && (!isAgeOk() || !(parseCharAge($("p_age").value) >= 18))) { $("p_18plus").checked = false; addMsg("sys", "Blocked: 18+ mode needs 18+ gate + adult age 18+."); } updatePreview(); persist(); };
+$("preset").onchange = () => { writePersona(PRESETS[$("preset").value]); updatePreview(); persist(); caiSyncHero(); };
 
 // ---------- director: response-directive mapping (injected as sentences) ----------
 const LEN = {
@@ -602,7 +583,7 @@ function composeSystem() {
     "FORMATTING: " + styleFormat(p) + "\n\n" +
     styleExample(p) + "\n\n" +
     "CONTINUITY: Treat STORY SO FAR and SCENE NOW as truth. Continue only from " + p.user + "'s last message. Add 1 new concrete detail per reply. Keep time, place and injuries consistent.\n\n" +
-    "BOUNDARIES: " + ((is18plusOn() && isAgeOk() && parseCharAge(p.age) !== null && parseCharAge(p.age) >= 18) ? BOUNDARIES_18(p.name) : BOUNDARIES_SFW(p.name)) + "\n\n" +
+    "BOUNDARIES: " + BOUNDARIES(p.name) + "\n\n" +
     (memory ? "STORY SO FAR: " + memory + "\n\n" : "") +
     (buildMemoryBlock() ? "MEMORY FACTS (treat as ground truth; do not contradict; newest last):\n" + buildMemoryBlock() + "\n\n" : "") +
     "You are " + p.name + ". Reply now in the RESPONSE SHAPE above.";
@@ -624,7 +605,7 @@ document.querySelectorAll("nav.tabs button").forEach((b) => {
 function persist() {
   store.save("persona", readPersona());
   store.save("direct", { len: $("d_len").value, bal: $("d_bal").value, pace: $("d_pace").value,
-    hook: $("d_hook").value, temp: $("d_temp").value, think: $("d_think").checked, e18: is18plusOn(),
+    hook: $("d_hook").value, temp: $("d_temp").value, think: $("d_think").checked,
     mode: $("d_mode").value, custom: $("d_custom").value, model: $("model").value,
     style: $("imgstyle").value, preset: $("preset").value,
     imgsize: $("imgsize").value, rstyle: $("d_style").value, ctx: $("d_ctx").value, turns: $("d_turns").value,
@@ -643,7 +624,6 @@ function restore() {
     if (d.ttsrate) { $("ttsrate").value = d.ttsrate; $("ttsrateval").textContent = d.ttsrate; }
     if (d.ttspitch) { $("ttspitch").value = d.ttspitch; $("ttspitchval").textContent = d.ttspitch; }
     $("model").value = d.model || ""; if (d.style) $("imgstyle").value = d.style;
-    if (d.e18 && isAgeOk() && parseCharAge($("p_age").value) >= 18) $("p_18plus").checked = true;
     if (d.rstyle) $("d_style").value = d.rstyle;
     if (d.ctx) $("d_ctx").value = d.ctx;
     if (d.turns) $("d_turns").value = d.turns;
@@ -707,9 +687,6 @@ $("refresh").onclick = loadModels;
 
 async function send(text, opts) {
   opts = opts || {};
-  if (!isAgeOk()) { addMsg("sys", "Blocked: confirm 18+ first (button above the tabs)."); return; }
-  const vc = validateCharAge(); if (!vc.ok) { addMsg("sys", vc.msg); return; } if (vc.warn) addMsg("sys", vc.warn);
-  if (is18plusOn() && !(parseCharAge($("p_age").value) >= 18)) { addMsg("sys", "Blocked: 18+ mode needs age-gate + age 18+."); return; }
   const model = $("model").value.trim();
   if (!model) { addMsg("sys", "Pick or type a model name first."); return; }
   charName = $("p_name").value.trim() || "Killua";
@@ -807,17 +784,8 @@ $("input").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("send").click(); }
 });
 $("stop").onclick = () => { ttsStop(); if (aborter) aborter.abort(); };
-function exportPersona() {
-  const p = readPersona(), e18 = is18plusOn();
-  const out = Object.assign({}, p, { safety: { age_gate: isAgeOk(), adult_only_18plus: e18,
-    note: e18 ? "18+ — consensual adult themes; bans: minors, non-consent, incest, real people, self-harm erotica" : "SFW — non-explicit" } });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: "application/json" }));
-  a.download = "persona-" + (p.name || "char").toLowerCase().replace(/\s+/g, "_") + (e18 ? "-18plus" : "") + ".json";
-  a.click();
-}
 $("save").onclick = () => {
-  let md = (is18plusOn() ? "> 🔞 18+ — consensual adult themes.\n\n" : "") + "# Roleplay with " + charName + "\n\n";
+  let md = "# Roleplay with " + charName + "\n\n";
   history.forEach((m) => { md += (m.role === "system" ? "## System\n" : m.role === "user" ? "**You:**\n" : "**" + charName + ":**\n") + m.content + "\n\n"; });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
@@ -1220,21 +1188,6 @@ $("ttsrate").oninput = () => { $("ttsrateval").textContent = $("ttsrate").value;
 $("ttspitch").oninput = () => { $("ttspitchval").textContent = $("ttspitch").value; persist(); };
 $("ttsauto").onchange = persist;
 
-// ---------- age gate (adults 18+ only) ----------
-function isAgeOk() { try { return store.load("ageok", 0) === 1; } catch (e) { return false; } }
-function applyGateLock() {
-  const ok = isAgeOk(), gate = $("agegate");
-  if (gate) gate.style.display = ok ? "none" : "block";
-  ["input", "send", "illustrate", "newscene"].forEach((id) => { const el = $(id); if (el) el.disabled = !ok; });
-  document.querySelectorAll("nav.tabs button").forEach((b) => { if (b.dataset.tab !== "chat") b.disabled = !ok; });
-  if (!ok) {
-    $("input").placeholder = "🔞 Confirm 18+ above to unlock chat.";
-    if ($("p_18plus") && $("p_18plus").checked) $("p_18plus").checked = false;
-  }
-}
-$("age_yes").onclick = () => { store.save("ageok", 1); applyGateLock(); addMsg("sys", "Age confirmed 18+. Chat unlocked."); updatePreview(); };
-$("age_no").onclick = () => { addMsg("sys", "Locked: adults 18+ only."); applyGateLock(); };
-
 // ---------- c.ai-style UI additions (additive; redefines nothing) ----------
 const AP_INSTRUCTION = "You are a character-creation assistant. The user will describe a roleplay character in one free-text prompt. Return ONLY a single JSON object, no other text, no markdown, no code fences, with EXACTLY these keys: {\"name\": string, \"age\": string, \"persona\": string (2-3 sentences: voice, values, flaw), \"hair\": string, \"eyes\": string, \"build\": string, \"outfit\": string, \"extra\": string, \"vibe\": string (1-2 sentences of plain prose describing the emotional dynamic: e.g. switch lean, warmth, boldness), \"scene\": string (2-3 sentences: where, when, who is present, the spark), \"user\": string (the user's name, default \"Traveler\"), \"userpersona\": string (1-2 sentences)}. Rules: every character is an adult aged 18 or older — if the description suggests a minor, age the character up to 18+ and note it in \"persona\"; if the user describes an adult dynamic, keep the adult framing; keep attraction playful and non-explicit; never leave a key empty, invent a sensible default instead; vibe must be prose, never numbers; scene must work as-is as an opening scene. User prompt:";
 function apParse(raw) {
@@ -1359,7 +1312,7 @@ caiObserveChat(); caiSyncHero();
 
 // ---------- boot ----------
 facts = store.load("facts", []); renderFacts();
-restore(); updatePreview(); loadModels(); populateVoices(); renderVariants(); applyGateLock(); renderGallery();
+restore(); updatePreview(); loadModels(); populateVoices(); renderVariants(); renderGallery();
 </script>
 </body>
 </html>"""
