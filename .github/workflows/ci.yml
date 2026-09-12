@@ -21,6 +21,8 @@ jobs:
         run: |
           python3 -c "import re;html=open('ollama_chat.py',encoding='utf-8').read();m=re.search(r'<script>(.*?)</script>',html,re.S);open('/tmp/app_inline.js','w').write(m.group(1))"
           node --check /tmp/app_inline.js
+          python3 -c "import os, re; src = open('ui.html', encoding='utf-8').read() if os.path.exists('ui.html') else ''; m = re.search(r'<script>(.*?)</script>', src, re.S) if src else None; open('/tmp/ui_script.js', 'w').write(m.group(1) if m else '// ok')"
+          node --check /tmp/ui_script.js
       - name: Contract tests (stubbed, no network)
         run: python3 tests/test_contract.py
       - name: API fuzz (malformed inputs)

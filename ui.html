@@ -1,0 +1,4885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>InfinityRoleplay — Character AI Studio</title>
+<!-- Materialize CSS & Google Material Icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" />
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<style>
+  :root {
+    --bg-main: #0c0d14;
+    --bg-sidebar: #12141e;
+    --bg-card: #181b29;
+    --bg-card-alt: #1e2235;
+    --bg-input: #10121b;
+    --bg-bubble-ai: #171b2a;
+    --bg-bubble-user: #222c44;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-hover: rgba(255, 255, 255, 0.16);
+    --text-main: #f3f4f8;
+    --text-muted: #959eb4;
+    --text-dim: #64708a;
+    --text-act: #b3bdd2;
+    --text-dlg: #ffe8b3;
+    --accent: #7c6cf0;
+    --accent-hover: #9082f7;
+    --accent-glow: rgba(124, 108, 240, 0.25);
+    --status-ok: #3ddad7;
+    --status-bad: #f87171;
+    --radius-sm: 8px;
+    --radius-md: 14px;
+    --radius-lg: 20px;
+    --radius-full: 9999px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    font-family: Roboto, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important;
+    background: var(--bg-main) !important;
+    color: var(--text-main) !important;
+    height: 100vh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Materialize Framework Overrides & Dark Theme Compatibility */
+  .card {
+    background-color: var(--bg-card) !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    border-radius: var(--radius-md) !important;
+  }
+  .row {
+    display: flex !important;
+    gap: 8px !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    margin-bottom: 0 !important;
+    margin-top: 10px !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+  }
+  .row:after {
+    display: none !important;
+  }
+  nav.tabs {
+    background: var(--bg-sidebar) !important;
+    height: auto !important;
+    line-height: normal !important;
+    box-shadow: none !important;
+    padding: 8px 10px !important;
+    border-top: 1px solid var(--border) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+  }
+  nav.tabs button {
+    height: 40px !important;
+    line-height: normal !important;
+  }
+  .material-icons {
+    font-size: 1.2rem;
+    vertical-align: middle;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+  .material-icons.left {
+    margin-right: 6px;
+    float: none !important;
+  }
+  .material-icons.right {
+    margin-left: 6px;
+    float: none !important;
+  }
+
+  /* Custom Form Input Reset for Dark Mode */
+  input:not([type]),
+  input[type=text]:not(.browser-default),
+  input[type=password]:not(.browser-default),
+  textarea:not(.browser-default),
+  select:not(.browser-default) {
+    background-color: var(--bg-input) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-sm) !important;
+    color: var(--text-main) !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
+    height: auto !important;
+    margin: 0 !important;
+    font-size: 0.9rem !important;
+    padding: 8px 12px !important;
+    transition: border-color 0.15s, box-shadow 0.15s !important;
+  }
+  input:not([type]):focus,
+  input[type=text]:not(.browser-default):focus,
+  input[type=password]:not(.browser-default):focus,
+  textarea:not(.browser-default):focus,
+  select:not(.browser-default):focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px var(--accent-glow) !important;
+    outline: none !important;
+  }
+  select:not(.browser-default) {
+    display: block !important;
+    cursor: pointer;
+  }
+
+  /* App Shell Layout */
+  .app-shell {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Sidebar (Character.AI left navigation) */
+  .sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    z-index: 30;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @media (max-width: 768px) {
+    .sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      transform: translateX(-100%);
+      box-shadow: 10px 0 35px rgba(0, 0, 0, 0.6);
+    }
+    .sidebar.open {
+      transform: translateX(0);
+    }
+  }
+
+  .sidebar-header {
+    height: 64px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: #fff;
+    letter-spacing: -0.2px;
+  }
+  .brand-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, var(--accent), #3ddad7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    box-shadow: 0 2px 8px var(--accent-glow);
+  }
+  .brand-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 2px 6px;
+    border-radius: var(--radius-full);
+    background: rgba(124, 108, 240, 0.2);
+    color: var(--accent);
+    border: 1px solid rgba(124, 108, 240, 0.35);
+  }
+  .sidebar-close {
+    display: none;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.3rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 50%;
+  }
+  .sidebar-close:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+  }
+  @media (max-width: 768px) {
+    .sidebar-close { display: flex; align-items: center; justify-content: center; }
+  }
+
+  .sidebar-btn-new {
+    height: 42px;
+    margin: 12px 14px;
+    padding: 0 14px;
+    background: linear-gradient(135deg, var(--accent), #5e4dd4);
+    border: none;
+    border-radius: var(--radius-md);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 4px 14px var(--accent-glow);
+    transition: filter 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+    flex-shrink: 0;
+  }
+  .sidebar-btn-new:hover {
+    filter: brightness(1.12);
+    box-shadow: 0 6px 18px var(--accent-glow);
+  }
+  .sidebar-btn-new:active { transform: scale(0.98); }
+
+  .sidebar-section-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-dim);
+    padding: 10px 16px 4px;
+  }
+
+  .char-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .char-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid transparent;
+    border-left: 3px solid transparent;
+    transition: background 0.15s, border-color 0.15s;
+    text-align: left;
+    width: 100%;
+    color: var(--text-main);
+  }
+  .char-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+  .char-item.active {
+    background: var(--bg-card);
+    border-color: var(--border);
+    border-left-color: var(--accent);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  }
+  .char-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #3ddad7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1rem;
+    color: #fff;
+    flex-shrink: 0;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  }
+  .char-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .char-meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .char-name {
+    font-weight: 600;
+    font-size: 0.88rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .char-desc {
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 1px;
+  }
+
+  /* Group Chat Sidebar Styles */
+  .group-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 8px 10px;
+  }
+  .group-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid transparent;
+    border-left: 3px solid transparent;
+    transition: background 0.15s, border-color 0.15s;
+    text-align: left;
+    width: 100%;
+    color: var(--text-main);
+  }
+  .group-item:hover { background: rgba(255, 255, 255, 0.04); }
+  .group-item.active {
+    background: var(--bg-card);
+    border-color: var(--border);
+    border-left-color: #10b981;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  }
+  .group-avatar-stack {
+    width: 40px;
+    height: 40px;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .group-avatar-stack span {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--bg-sidebar);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #fff;
+    position: absolute;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+  .group-avatar-stack span:nth-child(1) { left: 0; top: 0; background: #7c6cf0; z-index: 3; }
+  .group-avatar-stack span:nth-child(2) { left: 10px; top: 8px; background: #10b981; z-index: 2; }
+  .group-avatar-stack span:nth-child(3) { left: 18px; top: 16px; background: #f59e0b; z-index: 1; }
+
+  /* Group Chat Speaker Selector Bar */
+  .speaker-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: rgba(18, 22, 34, 0.95);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    margin-bottom: 6px;
+    overflow-x: auto;
+  }
+  .speaker-bar-label {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    margin-right: 4px;
+    white-space: nowrap;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .speaker-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .speaker-pill:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-main);
+  }
+  .speaker-pill.active {
+    background: var(--accent);
+    border-color: var(--accent-hover);
+    color: #fff;
+    box-shadow: 0 0 12px var(--accent-glow);
+  }
+  .speaker-pill.banter-btn {
+    background: rgba(61, 218, 215, 0.12);
+    border-color: rgba(61, 218, 215, 0.35);
+    color: #3ddad7;
+    margin-left: auto;
+  }
+  .speaker-pill.banter-btn:hover {
+    background: rgba(61, 218, 215, 0.25);
+    color: #fff;
+  }
+
+  /* Specific Character Avatar Themes */
+  .avatar-killua { background: linear-gradient(135deg, #7c6cf0, #a855f7) !important; color: #fff !important; }
+  .avatar-gon { background: linear-gradient(135deg, #059669, #10b981) !important; color: #fff !important; }
+  .avatar-kurapika { background: linear-gradient(135deg, #d97706, #ef4444) !important; color: #fff !important; }
+  .badge-killua { background: rgba(124, 108, 240, 0.18); color: #9f94f6; border: 1px solid rgba(124, 108, 240, 0.35); }
+  .badge-gon { background: rgba(16, 185, 129, 0.18); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); }
+  .badge-kurapika { background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); }
+
+  /* Sidebar Navigation / Drawer Toggles */
+  nav.tabs button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+    width: 100%;
+  }
+  nav.tabs button:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-main);
+  }
+  nav.tabs button.active {
+    background: var(--bg-card);
+    color: #fff;
+    border-color: var(--border);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  }
+  .tab-badge {
+    margin-left: auto;
+    font-size: 0.7rem;
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+  }
+
+  .sidebar-footer {
+    padding: 12px 14px;
+    border-top: 1px solid var(--border);
+    background: rgba(10, 11, 17, 0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .model-picker-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  #model {
+    flex: 1;
+    height: 36px !important;
+    padding: 0 10px !important;
+    font-size: 0.82rem !important;
+    border-radius: var(--radius-sm) !important;
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-main) !important;
+    min-width: 0;
+  }
+  #refresh {
+    height: 36px;
+    width: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  #refresh:hover { color: #fff; background: var(--bg-card-alt); border-color: var(--border-hover); }
+
+  #status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.74rem;
+    color: var(--text-dim);
+    padding: 2px 2px;
+    font-weight: 500;
+  }
+  #status::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    flex-shrink: 0;
+  }
+  #status.ok { color: var(--status-ok); }
+  #status.ok::before { background: var(--status-ok); box-shadow: 0 0 6px var(--status-ok); }
+  #status.bad { color: var(--status-bad); }
+  #status.bad::before { background: var(--status-bad); }
+
+  /* Main Chat Canvas */
+  .main-canvas {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    height: 100vh;
+    overflow: hidden;
+    background: radial-gradient(1000px 450px at 50% -10%, rgba(124, 108, 240, 0.08) 0%, transparent 65%), var(--bg-main);
+  }
+
+  /* Top Character Header */
+  header.top {
+    height: 64px;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    background: rgba(18, 20, 30, 0.92);
+    backdrop-filter: blur(14px);
+    z-index: 20;
+    flex-shrink: 0;
+  }
+  .cai-top {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+  }
+  .menu-toggle {
+    display: none;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+  }
+  .menu-toggle:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+  }
+  @media (max-width: 768px) {
+    .menu-toggle { display: inline-flex; }
+  }
+
+  .cai-id {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+  .cai-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #3ddad7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.12), 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+  .cai-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .cai-idtxt {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .cai-idtxt h1 {
+    font-size: 1.15rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.2px;
+    margin: 0 !important;
+    line-height: 1.2 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #fff;
+  }
+  .cai-tag {
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    margin: 3px 0 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .status-pulse-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--status-ok);
+    box-shadow: 0 0 6px var(--status-ok);
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-header {
+    height: 38px;
+    padding: 0 14px;
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  }
+  .btn-header:hover {
+    color: #fff;
+    background: var(--bg-card-alt);
+    border-color: var(--border-hover);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  }
+  .btn-header.accent {
+    background: rgba(124, 108, 240, 0.18);
+    border-color: rgba(124, 108, 240, 0.4);
+    color: #c4bdff;
+  }
+  .btn-header.accent:hover {
+    background: rgba(124, 108, 240, 0.3);
+    color: #fff;
+  }
+
+  /* Chat Messages Stream Area */
+  .chat-scroll-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    padding-bottom: 160px;
+    scroll-behavior: smooth;
+  }
+  #chat {
+    max-width: 820px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  /* Welcome Banner */
+  .cai-welcome {
+    text-align: center;
+    padding: 40px 20px 24px;
+    max-width: 540px;
+    margin: 0 auto;
+    animation: fadeIn 0.3s ease;
+  }
+  .cai-welcome-art {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #3ddad7);
+    margin: 0 auto 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.2rem;
+    color: #fff;
+    box-shadow: 0 0 28px var(--accent-glow);
+  }
+  .cai-welcome-title {
+    font-size: 1.35rem !important;
+    font-weight: 700 !important;
+    color: var(--text-main);
+    margin-bottom: 8px !important;
+  }
+  .cai-welcome-sub {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+  .cai-hello-btn {
+    margin-top: 16px;
+    padding: 8px 22px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    color: var(--accent);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .cai-hello-btn:hover {
+    background: var(--bg-card-alt);
+    border-color: var(--accent);
+    box-shadow: 0 0 12px var(--accent-glow);
+  }
+
+  /* Message Rows */
+  .msg-row {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+    align-items: flex-start;
+    animation: msgIn 0.2s ease-out;
+  }
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+  }
+  .msg-row.you {
+    justify-content: flex-end;
+  }
+  .msg-row.sys {
+    justify-content: center;
+  }
+
+  .msg-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #3ddad7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+    margin-top: 2px;
+    overflow: hidden;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  }
+  .msg-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+  .msg-content-wrap {
+    max-width: 82%;
+    display: flex;
+    flex-direction: column;
+  }
+  .msg-row.you .msg-content-wrap {
+    align-items: flex-end;
+  }
+
+  .msg-sender-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+  }
+  .msg-sender-name {
+    font-weight: 600;
+    color: var(--text-main);
+  }
+
+  .msg {
+    padding: 14px 18px;
+    border-radius: 16px;
+    line-height: 1.6;
+    font-size: 0.94rem;
+    word-break: break-word;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.22);
+  }
+  .msg.ai {
+    background: var(--bg-bubble-ai);
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    border-top-left-radius: 4px;
+  }
+  .msg.you {
+    background: var(--bg-bubble-user);
+    border: 1px solid rgba(124, 108, 240, 0.25);
+    color: #f1f5f9;
+    border-top-right-radius: 4px;
+  }
+  .msg.sys {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px dashed var(--border);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    padding: 6px 14px;
+    box-shadow: none;
+    max-width: 90%;
+  }
+
+  /* Formatting within messages */
+  .msg .act {
+    color: var(--text-act);
+    font-style: italic;
+  }
+  .msg .dlg {
+    color: var(--text-dlg);
+    font-weight: 500;
+  }
+  .msg .md-h {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 8px 0 4px;
+    color: #fff;
+  }
+  .msg .md-li {
+    margin: 2px 0 2px 18px;
+    list-style: disc;
+  }
+  .msg .md-code {
+    font-family: monospace;
+    background: #090a0f;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.88em;
+    color: #e2e8f0;
+  }
+  .msg .md-pre {
+    font-family: monospace;
+    background: #090a0f;
+    border: 1px solid var(--border);
+    padding: 10px 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 0.85em;
+    margin: 8px 0;
+  }
+  mark {
+    background: rgba(240, 180, 106, 0.35);
+    color: #fff;
+    border-radius: 3px;
+    padding: 0 3px;
+  }
+
+  /* Thinking traces */
+  details.think-trace {
+    margin-bottom: 10px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  details.think-trace summary {
+    padding: 6px 10px;
+    font-size: 0.76rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  details.think-trace summary:hover { color: var(--text-muted); }
+  details.think-trace .think-body {
+    padding: 8px 10px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-family: monospace;
+    white-space: pre-wrap;
+    border-top: 1px solid var(--border);
+    max-height: 180px;
+    overflow-y: auto;
+    background: rgba(0,0,0,0.15);
+  }
+
+  /* Message Action Bar (c.ai hover controls) */
+  .msg-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .msg-tool-btn {
+    height: 28px;
+    padding: 0 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: all 0.12s;
+  }
+  .msg-tool-btn:hover {
+    color: #fff;
+    background: var(--bg-card-alt);
+    border-color: var(--border-hover);
+  }
+  .msg-tool-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  /* Variant swiping container */
+  .variant-bar {
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0 6px;
+  }
+  .variant-bar button {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+  }
+  .variant-bar button:hover:not(:disabled) {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .variant-bar button:disabled { opacity: 0.3; cursor: default; }
+  .variant-label {
+    font-size: 0.74rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    min-width: 28px;
+    text-align: center;
+  }
+
+  /* Floating Bottom Composer */
+  .composer-wrapper {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 20px 16px;
+    background: linear-gradient(180deg, transparent 0%, rgba(12, 13, 20, 0.85) 25%, var(--bg-main) 100%);
+    pointer-events: none;
+    z-index: 25;
+  }
+  .card.composer {
+    pointer-events: auto;
+    max-width: 820px;
+    margin: 0 auto !important;
+    background: rgba(20, 24, 36, 0.95) !important;
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border) !important;
+    border-radius: 22px !important;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55) !important;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* Scene preview banner above input (hidden - illustrations render directly in chat) */
+  .scene-card-preview {
+    display: none !important;
+  }
+  #sceneimg {
+    display: none;
+  }
+  #scenecap {
+    display: none;
+  }
+
+  /* Scene illustration inside chat stream message bubble */
+  .msg-scene-card {
+    margin-top: 10px;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: #0d1117;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+    max-width: 480px;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+  }
+  .msg-scene-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+  .msg-scene-card a {
+    display: block;
+    line-height: 0;
+  }
+  .msg-scene-img {
+    width: 100%;
+    max-height: 380px;
+    object-fit: cover;
+    display: block;
+    cursor: zoom-in;
+    background: #161b22;
+  }
+  .msg-scene-caption {
+    padding: 8px 12px;
+    background: rgba(18, 22, 31, 0.92);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .composer-input-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+  #input {
+    flex: 1;
+    min-height: 48px;
+    max-height: 160px;
+    padding: 12px 16px;
+    font-size: 0.95rem;
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 16px !important;
+    color: var(--text-main) !important;
+    resize: none;
+    line-height: 1.5;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  #input:focus {
+    outline: none !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px var(--accent-glow) !important;
+  }
+
+  .composer-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    padding-bottom: 3px;
+  }
+  .btn-circle {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.12s, filter 0.12s;
+  }
+  #send {
+    background: linear-gradient(135deg, var(--accent), #5e4dd4);
+    color: #fff;
+    box-shadow: 0 4px 14px var(--accent-glow);
+  }
+  #send:hover:not(:disabled) { filter: brightness(1.12); transform: scale(1.04); }
+  #send:active:not(:disabled) { transform: scale(0.96); }
+  #send:disabled { opacity: 0.4; cursor: default; }
+
+  #stop {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #dc2626;
+    color: #fff;
+    border: none;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.4);
+  }
+  #stop:hover:not(:disabled) { background: #b91c1c; }
+  #stop:disabled { display: none; }
+
+  .btn-icon-subtle {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-icon-subtle:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--border-hover);
+  }
+
+  .composer-footer-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    padding-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+  }
+  .repair-chips {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .chip-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    color: var(--text-muted);
+    padding: 4px 10px;
+    font-size: 0.74rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.12s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .chip-btn:hover {
+    color: #fff;
+    border-color: var(--border-hover);
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .stats {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Slide-over Drawers / Modals */
+  .sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(4px);
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .sheet-backdrop:not([hidden]) {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .drawer-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(540px, 100vw);
+    background: var(--bg-sidebar);
+    border-left: 1px solid var(--border);
+    z-index: 50;
+    transform: translateX(100%);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    box-shadow: -10px 0 40px rgba(0, 0, 0, 0.6);
+  }
+  .drawer-panel.active {
+    transform: translateX(0);
+  }
+
+  .drawer-header {
+    height: 64px;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(18, 20, 30, 0.5);
+    flex-shrink: 0;
+  }
+  .drawer-title {
+    font-size: 1.15rem !important;
+    font-weight: 700 !important;
+    margin: 0 !important;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .drawer-close {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.25rem;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+  }
+  .drawer-close:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+  }
+
+  /* Form Elements */
+  label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin: 14px 0 6px;
+  }
+  textarea { min-height: 76px; resize: vertical; line-height: 1.45; }
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 500px) {
+    .grid2 { grid-template-columns: 1fr; }
+  }
+
+  input[type=range] {
+    width: 100%;
+    accent-color: var(--accent);
+    height: 32px;
+  }
+  button.secondary {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  button.secondary:hover { background: var(--bg-card-alt); border-color: var(--border-hover); }
+  button.tiny { padding: 5px 10px; font-size: 0.78rem; min-height: 32px; }
+
+  /* Gallery Grid */
+  .gal {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .gal figure {
+    position: relative;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: #000;
+    border: 1px solid var(--border);
+  }
+  .gal img {
+    width: 100%;
+    aspect-ratio: 2/3;
+    object-fit: cover;
+    display: block;
+  }
+  .gal figcaption {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    padding: 6px;
+    background: rgba(10, 12, 17, 0.85);
+  }
+  .galdel {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.7rem;
+    cursor: pointer;
+  }
+
+  pre.preview {
+    white-space: pre-wrap;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    background: #08090d;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    color: var(--text-muted);
+    max-height: 220px;
+    overflow-y: auto;
+    font-family: monospace;
+  }
+
+  /* Utility classes */
+  .hidden { display: none !important; }
+  .tabpage { display: none; }
+  .tabpage.active { display: block; }
+
+  .speaker-pill.mention-active {
+    border-color: #3ddad7 !important;
+    background: rgba(61, 218, 215, 0.25) !important;
+    color: #fff !important;
+    box-shadow: 0 0 14px rgba(61, 218, 215, 0.5) !important;
+    transform: scale(1.05);
+  }
+  .speaker-pill.banter-pulsing {
+    animation: banterPulse 0.9s infinite alternate;
+  }
+  @keyframes banterPulse {
+    from { opacity: 0.7; transform: scale(0.98); }
+    to { opacity: 1; transform: scale(1.04); box-shadow: 0 0 16px rgba(61, 218, 215, 0.6); }
+  }
+
+  /* Materialize Modal Theme Overrides */
+  .modal {
+    background-color: var(--bg-card) !important;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md) !important;
+    color: var(--text-main);
+    max-height: 85vh;
+  }
+  .modal .modal-content {
+    padding: 20px 24px;
+    background-color: var(--bg-card);
+    color: var(--text-main);
+  }
+  .modal .modal-footer {
+    background-color: var(--bg-sidebar) !important;
+    border-top: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+  }
+  .modal h4 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0 0 16px 0;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .creator-avatar-preview {
+    width: 80px;
+    height: 80px;
+    border-radius: var(--radius-sm);
+    object-fit: cover;
+    background: #000;
+    border: 1px solid var(--border);
+  }
+  .online-card-item {
+    background: var(--bg-card-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .online-card-item:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- Left Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="brand">
+        <div class="brand-icon">♾️</div>
+        <span>InfinityRoleplay</span>
+        <span class="brand-badge">Studio</span>
+      </div>
+      <button class="sidebar-close" id="sidebarClose" aria-label="Close sidebar">✕</button>
+    </div>
+
+    <button class="sidebar-btn-new waves-effect waves-light" id="btnNewChat">
+      <i class="material-icons">add</i><span>New Conversation</span>
+    </button>
+
+    <div class="sidebar-section-title" style="display:flex; justify-content:space-between; align-items:center;">
+      <span>Characters</span>
+      <div style="display:flex; gap:4px;">
+        <button id="btnOpenCardCreator" class="chip-btn waves-effect" type="button" title="Create Character Card V2" style="padding:2px 6px; font-size:0.68rem; color:var(--accent); border-color:var(--accent);"><i class="material-icons" style="font-size:0.75rem; vertical-align:middle;">add</i> New</button>
+        <button id="btnOpenOnlineSearch" class="chip-btn waves-effect" type="button" title="Search Online Characters" style="padding:2px 6px; font-size:0.68rem; color:var(--status-ok); border-color:var(--status-ok);"><i class="material-icons" style="font-size:0.75rem; vertical-align:middle;">travel_explore</i> Online</button>
+        <button id="btnOpenAiGen" class="chip-btn waves-effect" type="button" title="Generate with AI" style="padding:2px 6px; font-size:0.68rem; color:#f59e0b; border-color:#f59e0b;"><i class="material-icons" style="font-size:0.75rem; vertical-align:middle;">auto_awesome</i> AI</button>
+      </div>
+    </div>
+    <div style="padding: 0 12px 6px;">
+      <input id="charSearch" type="text" placeholder="Filter characters…" aria-label="Filter characters" style="height:32px; font-size:0.78rem; padding:4px 8px; border-radius:var(--radius-sm);" />
+    </div>
+    <div class="char-list" id="charList">
+      <!-- Injected dynamically -->
+    </div>
+
+    <div class="sidebar-section-title" style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
+      <span>Group Chats</span>
+      <button id="btnNewGroup" class="chip-btn" type="button" style="font-size:0.7rem; padding:2px 8px; color:var(--accent);">＋ Room</button>
+    </div>
+    <div class="group-list" id="groupList">
+      <!-- Injected dynamically -->
+    </div>
+
+    <!-- Tab Drawer Links -->
+    <nav class="tabs" aria-label="Studio controls">
+      <button data-tab="chat" class="waves-effect active" type="button"><i class="material-icons">chat_bubble_outline</i><span>Chat Stream</span></button>
+      <button data-tab="group" class="waves-effect" type="button"><i class="material-icons">groups</i><span>Group Rooms</span></button>
+      <button data-tab="persona" class="waves-effect" type="button"><i class="material-icons">psychology</i><span>Persona Studio</span></button>
+      <button data-tab="direct" class="waves-effect" type="button"><i class="material-icons">tune</i><span>Director Settings</span></button>
+      <button data-tab="gallery" class="waves-effect" type="button"><i class="material-icons">photo_library</i><span>Scene Gallery</span> <span id="galcount" class="tab-badge"></span></button>
+      <button data-tab="memory" class="waves-effect" type="button"><i class="material-icons">history_edu</i><span>Memory Ledger</span> <span id="factcount" class="tab-badge"></span></button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="model-picker-row">
+        <input id="model" list="models" placeholder="Model name" aria-label="Ollama Model" />
+        <datalist id="models"></datalist>
+        <button id="refresh" class="waves-effect" type="button" title="Refresh local models"><i class="material-icons">refresh</i></button>
+      </div>
+      <div id="status" role="status">checking Ollama…</div>
+    </div>
+  </aside>
+
+  <!-- Main Workspace -->
+  <main class="main-canvas">
+
+    <!-- Top Character Header -->
+    <header class="top">
+      <div class="cai-top">
+        <button class="menu-toggle waves-effect btn-flat" id="menuToggle" aria-label="Open character menu"><i class="material-icons">menu</i></button>
+        <div class="cai-id">
+          <div class="cai-avatar" id="caiAvatar">
+            <img id="caiAvatarImg" alt="" hidden />
+            <span id="caiAvatarInit">K</span>
+          </div>
+          <div class="cai-idtxt">
+            <h1 id="caiName">Killua</h1>
+            <p class="cai-tag" id="caiTag"><span class="status-pulse-dot"></span>local roleplay · private &amp; free</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="illustrate" class="btn-header waves-effect waves-light" type="button" title="Illustrate this scene moment"><i class="material-icons">photo_camera</i><span>Illustrate</span></button>
+        <button id="newscene" class="btn-header waves-effect waves-light" type="button" title="Start fresh scene with character"><i class="material-icons">auto_awesome</i><span>New scene</span></button>
+        <button id="btnOpenPersona" class="btn-header accent waves-effect waves-light" type="button" title="Edit character persona"><i class="material-icons">tune</i><span>Persona</span></button>
+      </div>
+    </header>
+
+    <!-- Scrollable Chat Stream Container -->
+    <div class="chat-scroll-wrapper" id="chatScroll">
+      <div class="cai-welcome" id="caiWelcome">
+        <div class="cai-welcome-art" aria-hidden="true">✦</div>
+        <h2 class="cai-welcome-title" id="caiWelcomeTitle">Start your story with Killua</h2>
+        <p class="cai-welcome-sub">Say hello below to dive into the scene, or shape details in Persona Studio.</p>
+        <button class="cai-hello-btn waves-effect waves-light" id="caiHello" type="button"><i class="material-icons" style="font-size:1.05rem; vertical-align:middle; margin-right:4px;">waving_hand</i><span>Say hello</span></button>
+      </div>
+
+      <div id="chat" aria-live="polite" aria-label="Roleplay Conversation">
+        <!-- Messages stream here -->
+      </div>
+    </div>
+
+    <!-- Floating Bottom Composer -->
+    <div class="composer-wrapper">
+      <div class="card composer">
+        <!-- Hidden scene image anchor (preserves element IDs for backwards compatibility) -->
+        <div id="sceneCardPreview" style="display:none !important;"><img id="sceneimg" style="display:none !important;" alt="Scene illustration" /><div id="scenecap" style="display:none !important;"></div></div>
+        <!-- Group Chat Speaker Selector Bar (shown when in group chat) -->
+        <div class="speaker-bar" id="speakerBar" style="display:none;">
+          <span class="speaker-bar-label">Next Speaker:</span>
+          <div id="speakerPills" style="display:flex; align-items:center; gap:6px; flex:1; overflow-x:auto;"></div>
+          <button class="speaker-pill banter-btn waves-effect waves-light" id="btnBanter" type="button" title="Let the characters banter with each other without typing"><i class="material-icons" style="font-size:0.95rem;">forum</i><span>Continue Banter</span></button>
+        </div>
+
+        <div class="composer-input-row">
+          <textarea id="input" placeholder="Message Killua… (Enter to send · Shift+Enter for newline)" aria-label="Your message"></textarea>
+          <div class="composer-actions">
+            <button id="dictate" class="btn-icon-subtle waves-effect waves-light" type="button" title="Voice dictation"><i class="material-icons">mic</i></button>
+            <button id="save" class="btn-icon-subtle waves-effect waves-light" type="button" title="Save / export transcript"><i class="material-icons">save_alt</i></button>
+            <button id="stop" class="btn-circle waves-effect waves-light" type="button" disabled title="Stop generation"><i class="material-icons">stop</i></button>
+            <button id="send" class="btn-circle waves-effect waves-light" type="button" title="Send message"><i class="material-icons">arrow_upward</i></button>
+          </div>
+        </div>
+
+        <div class="composer-footer-row">
+          <div class="repair-chips">
+            <span style="font-size:0.72rem; color:var(--text-dim); display:flex; align-items:center; gap:4px;"><i class="material-icons" style="font-size:0.85rem;">auto_fix_high</i> Nudges:</span>
+            <button class="chip-btn waves-effect" data-fix="speak" type="button" title="Rewrite without narrating for you">🔧 spoke for me</button>
+            <button class="chip-btn waves-effect" data-fix="long" type="button" title="Rewrite shorter with 1 hook">🔧 too long</button>
+            <button class="chip-btn waves-effect" data-fix="ooc" type="button" title="Pull back in character">🔧 broke character</button>
+          </div>
+          <div class="stats" id="stats"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Modals & Drawers Backdrop -->
+  <div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
+
+  <!-- Slide-Over Drawer for Studio / Director / Gallery / Memory -->
+  <div class="drawer-panel" id="drawerPanel">
+    <div class="drawer-header">
+      <h3 class="drawer-title" id="drawerTitle">Studio</h3>
+      <button class="drawer-close waves-effect btn-flat" id="drawerClose"><i class="material-icons">close</i></button>
+    </div>
+    <div class="drawer-body">
+
+      <!-- Group Chat Tab -->
+      <section id="tab-group" class="tabpage">
+        <label for="group_title">Group Chat Title</label>
+        <input id="group_title" type="text" placeholder="e.g. Hunter Trio: Yorknew Strategy" value="Hunter Trio: Yorknew Strategy" />
+
+        <label style="margin-top:14px;">Select Participating Characters</label>
+        <div id="group_char_checkboxes" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+          <!-- Dynamically populated -->
+        </div>
+
+        <label for="group_scenario" style="margin-top:14px;">Group Scenario / Setting</label>
+        <textarea id="group_scenario" rows="3" placeholder="Describe where everyone is and the situation...">A secluded campsite in the wilderness near Yorknew City. A crackling campfire illuminates the faces of Killua, Gon, and Kurapika as they plan their next move, sharing food and tactical insights under the starlit sky.</textarea>
+
+        <div class="row" style="margin-top:16px;">
+          <button id="btnCreateGroup" class="secondary" style="background:var(--accent); color:#fff; border-color:var(--accent-hover);" type="button">＋ Create &amp; Enter Group Chat</button>
+        </div>
+      </section>
+
+      <!-- Persona Tab -->
+      <section id="tab-persona" class="tabpage">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label for="preset" style="margin:0;">Character Preset</label>
+          <div style="display:flex; gap:6px;">
+            <button id="card_export_btn" class="secondary tiny" type="button" title="Export Character Card V2 (JSON)">📤 Export V2</button>
+            <button id="card_import_btn" class="secondary tiny" type="button" title="Import Character Card V2 / TavernAI (JSON)">📥 Import V2</button>
+            <input type="file" id="card_file_input" accept=".json" class="hidden" />
+          </div>
+        </div>
+        <select id="preset" style="margin-top:6px;">
+          <option value="killua">Killua Zoldyck — Hunter / Assassin</option>
+          <option value="gon">Gon Freecss — Enhancer Hunter</option>
+          <option value="kurapika">Kurapika — Kurta Clan / Blacklist Hunter</option>
+          <option value="elara">Elara — elven ranger</option>
+          <option value="nova">NOVA — rogue station AI</option>
+        </select>
+
+        <div class="grid2">
+          <div><label for="p_name">Name</label><input id="p_name" type="text" /></div>
+          <div><label for="p_age">Age (18+)</label><input id="p_age" type="text" /></div>
+        </div>
+
+        <label for="p_persona">Persona (voice, values, Nen, flaws)</label>
+        <textarea id="p_persona" rows="3"></textarea>
+
+        <label for="p_greeting">Character Greeting (First Message)</label>
+        <textarea id="p_greeting" rows="3" placeholder="How the character greets you when the roleplay begins..."></textarea>
+
+        <label for="p_mes_example">Dialogue Examples (Card V2 &lt;START&gt;)</label>
+        <textarea id="p_mes_example" rows="2" placeholder="<START>\n{{user}}: Hey\n{{char}}: *smiles* Hey!"></textarea>
+
+        <div class="grid2">
+          <div><label for="p_hair">Hair</label><input id="p_hair" type="text" /></div>
+          <div><label for="p_eyes">Eyes</label><input id="p_eyes" type="text" /></div>
+          <div><label for="p_build">Build</label><input id="p_build" type="text" /></div>
+          <div><label for="p_outfit">Outfit</label><input id="p_outfit" type="text" /></div>
+        </div>
+
+        <label for="p_extra">Extra appearance details</label>
+        <input id="p_extra" type="text" />
+
+        <label for="p_vibe">Dynamic &amp; Vibe (prose)</label>
+        <textarea id="p_vibe" rows="2"></textarea>
+
+        <label for="p_scene">Opening scene context</label>
+        <textarea id="p_scene" rows="3"></textarea>
+
+        <div class="grid2">
+          <div><label for="p_user">Your Name</label><input id="p_user" type="text" value="Traveler" /></div>
+          <div><label for="p_userpersona">You are</label><input id="p_userpersona" type="text" value="A weary traveler with a mysterious past." /></div>
+        </div>
+
+        <div style="margin-top:20px; padding:12px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:var(--radius-sm);">
+          <label for="ap_prompt">✨ AI Character Generator</label>
+          <textarea id="ap_prompt" placeholder="Describe a character in one sentence (e.g. A cynical cyberpunk courier who owes a debt...)" rows="2"></textarea>
+          <div class="row">
+            <button id="ap_btn" class="secondary" type="button">✨ Generate Character</button>
+          </div>
+          <div class="stats" id="ap_msg"></div>
+        </div>
+      </section>
+
+      <!-- Director Tab -->
+      <section id="tab-direct" class="tabpage">
+        <div class="grid2">
+          <div>
+            <label for="d_len">Reply length</label>
+            <select id="d_len">
+              <option value="flash">⚡ Flash ~60 words</option>
+              <option value="short" selected>Short ~150 words</option>
+              <option value="medium">Medium ~300 words</option>
+              <option value="long">Long ~600 words</option>
+            </select>
+          </div>
+          <div>
+            <label for="d_bal">Dialogue ↔ Action</label>
+            <select id="d_bal">
+              <option value="dialogue">🗣 Dialogue-heavy</option>
+              <option value="balanced" selected>⚖ Balanced</option>
+              <option value="narration">🌫 Narration-heavy</option>
+            </select>
+          </div>
+          <div>
+            <label for="d_pace">Pacing</label>
+            <select id="d_pace">
+              <option value="snappy" selected>🏃 Snappy</option>
+              <option value="slow">🕯 Slow-burn</option>
+            </select>
+          </div>
+          <div>
+            <label for="d_hook">Ending hook</label>
+            <select id="d_hook">
+              <option value="on" selected>Hook on (question / move)</option>
+              <option value="off">Hook off (natural end)</option>
+            </select>
+          </div>
+          <div>
+            <label for="d_style">Response style</label>
+            <select id="d_style">
+              <option value="modern" selected>✨ Modern (*italics* + dialogue)</option>
+              <option value="classic">📜 Classic RP ("quotes" + *actions*)</option>
+            </select>
+          </div>
+          <div>
+            <label for="d_ctx">Model context window</label>
+            <select id="d_ctx">
+              <option value="4096">4k — fast default</option>
+              <option value="8192">8k — deep context</option>
+              <option value="16384">16k — large history</option>
+              <option value="32768">32k — novel length</option>
+              <option value="65536">64k — massive memory</option>
+              <option value="120000" selected>120k — maximum context (120k tokens)</option>
+            </select>
+          </div>
+          <div>
+            <label for="d_turns">History turns kept</label>
+            <select id="d_turns">
+              <option value="10">Last 10 turns</option>
+              <option value="25">Last 25 turns</option>
+              <option value="50">Last 50 turns</option>
+              <option value="100">Last 100 turns</option>
+              <option value="999" selected>All (Full 120k context budget)</option>
+            </select>
+          </div>
+        </div>
+
+        <label for="d_temp">Creativity (Temperature): <span id="tempval">0.75</span></label>
+        <input id="d_temp" type="range" min="0" max="1.5" step="0.05" value="0.75" />
+
+        <label style="display:flex; align-items:center; gap:8px; margin-top:10px;">
+          <input id="d_think" type="checkbox" style="width:auto;" /> Show thinking traces (for thinking models)
+        </label>
+
+        <label for="d_mode">Prompt Mode</label>
+        <select id="d_mode">
+          <option value="auto" selected>Auto-compose from Persona + Director</option>
+          <option value="custom">Custom system prompt</option>
+        </select>
+
+        <div id="customPromptBox" class="hidden">
+          <label for="d_custom">Custom System Prompt</label>
+          <textarea id="d_custom" rows="4" placeholder="Type custom system prompt here…"></textarea>
+        </div>
+
+        <label style="margin-top:16px;">Live System Prompt Preview</label>
+        <pre class="preview" id="preview"></pre>
+      </section>
+
+      <!-- Gallery Tab -->
+      <section id="tab-gallery" class="tabpage">
+        <!-- Hapuppy API Key Config Card -->
+        <div style="margin-bottom:14px; padding:12px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:var(--radius-sm);">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label for="hapuppy_key" style="margin:0; font-size:0.8rem; font-weight:700;">Hapuppy Image API Key</label>
+            <span id="hapuppy_status" style="font-size:0.75rem; font-weight:600; color:var(--status-ok);"></span>
+          </div>
+          <p style="font-size:0.74rem; color:var(--text-muted); margin:4px 0 8px;">Used for Gemini 3.1 Flash Image scene generation. Saved in .env &amp; database.</p>
+          <div style="display:flex; gap:8px;">
+            <input id="hapuppy_key" type="password" placeholder="sk-hapuppy-..." style="flex:1;" />
+            <button id="hapuppy_save_btn" class="secondary tiny" type="button">Save Key</button>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div>
+            <label for="imgstyle">Art Style</label>
+            <select id="imgstyle">
+              <option value="soft anime illustration, clean lineart, warm cinematic lighting">Anime</option>
+              <option value="cozy fantasy oil painting, painterly, warm lamp light">Fantasy painting</option>
+              <option value="cinematic photo, shallow depth of field, neon and rain">Cinematic</option>
+              <option value="soft watercolor illustration, gentle washes, dreamy">Watercolor</option>
+            </select>
+          </div>
+          <div>
+            <label for="imgsize">Aspect Ratio</label>
+            <select id="imgsize">
+              <option value="portrait" selected>Portrait</option>
+              <option value="square">Square</option>
+              <option value="landscape">Landscape</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <button id="compare" class="secondary tiny" type="button">⚔ Compare 3 Variations</button>
+          <button id="galclear" class="secondary tiny" type="button">🗑 Delete All Images</button>
+        </div>
+
+        <div class="gal" id="cmp" style="margin-top:14px"></div>
+        <label style="margin-top:16px;">Saved Illustrations</label>
+        <div class="gal" id="gal" style="margin-top:8px"></div>
+      </section>
+
+      <!-- Memory Tab -->
+      <section id="tab-memory" class="tabpage">
+        <label for="recallq">Search Memory &amp; Transcript</label>
+        <input id="recallq" type="text" placeholder="Search a keyword, name, or promise…" />
+        <div id="recallres" style="margin-top:8px"></div>
+
+        <div style="margin-top:16px;">
+          <div class="row" style="justify-content:space-between;">
+            <label style="margin:0;">Fact Ledger</label>
+            <div>
+              <button id="factextract" class="secondary tiny" type="button">⛏ Extract Facts</button>
+              <button id="factexport" class="secondary tiny" type="button">⬆ Export</button>
+              <button id="factimport" class="secondary tiny" type="button">⬇ Import</button>
+              <button id="factclear" class="secondary tiny" type="button">🗑 Clear</button>
+              <input type="file" id="factfile" class="hidden" accept=".json" />
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:8px;">
+            <select id="factadd_cat" style="width:110px;">
+              <option value="ENTITY">ENTITY</option>
+              <option value="PROMISE">PROMISE</option>
+              <option value="INJURY">INJURY</option>
+              <option value="MILESTONE">MILESTONE</option>
+              <option value="USER">USER</option>
+              <option value="QUOTE">QUOTE</option>
+            </select>
+            <input id="factadd_text" type="text" placeholder="Add a specific lasting fact…" style="flex:1;" />
+            <button id="factadd_btn" class="secondary tiny" type="button">Add</button>
+          </div>
+
+          <div id="factlist" style="margin-top:10px; display:flex; flex-direction:column; gap:6px;"></div>
+        </div>
+
+        <div style="margin-top:20px; padding-top:14px; border-top:1px solid var(--border);">
+          <label>Text-to-Speech (TTS)</label>
+          <select id="ttsvoice" style="margin-top:4px;"></select>
+          <label style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+            <input id="ttsauto" type="checkbox" style="width:auto;" /> Auto-read AI responses aloud
+          </label>
+          <div class="grid2">
+            <div>
+              <label>Rate: <span id="ttsrateval">1</span>x</label>
+              <input id="ttsrate" type="range" min="0.5" max="2" step="0.1" value="1" />
+            </div>
+            <div>
+              <label>Pitch: <span id="ttspitchval">1</span></label>
+              <input id="ttspitch" type="range" min="0" max="2" step="0.1" value="1" />
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:20px; padding-top:14px; border-top:1px solid var(--border);">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label style="margin:0; font-size:0.82rem; font-weight:700;">Studio Archive &amp; Backup</label>
+            <span id="backup_status" style="font-size:0.75rem; color:var(--text-dim);"></span>
+          </div>
+          <p style="font-size:0.74rem; color:var(--text-muted); margin:4px 0 10px;">Export or restore complete studio state (characters, group rooms, transcripts, memories).</p>
+          <div class="row">
+            <button id="btnBackup" class="secondary tiny waves-effect" type="button"><i class="material-icons" style="font-size:1rem;">cloud_download</i> Export Backup</button>
+            <button id="btnRestore" class="secondary tiny waves-effect" type="button"><i class="material-icons" style="font-size:1rem;">cloud_upload</i> Restore Backup</button>
+            <input type="file" id="fileRestore" class="hidden" accept=".json" />
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- Hidden elements preserving required IDs -->
+  <div class="hidden">
+    <button id="regen" type="button">Regenerate</button>
+    <button id="vprev" type="button">Prev</button>
+    <span id="vlabel"></span>
+    <button id="vnext" type="button">Next</button>
+  </div>
+
+</div>
+
+<!-- Modal: Character Card Creator -->
+<div id="modalCardCreator" class="modal modal-fixed-footer">
+  <div class="modal-content">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <h4 style="margin:0;"><i class="material-icons" style="color:var(--accent);">badge</i> Character Card Studio (V2)</h4>
+      <div style="display:flex; gap:8px;">
+        <button id="btnCcQuickAi" class="chip-btn waves-effect" type="button" style="color:var(--accent); border-color:var(--accent);"><i class="material-icons" style="font-size:0.85rem;">auto_awesome</i> AI Assist</button>
+        <button id="btnCcReset" class="chip-btn waves-effect" type="button" title="Clear form"><i class="material-icons" style="font-size:0.85rem;">restart_alt</i> Reset</button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs inside Creator -->
+    <div class="creator-tabs-bar" style="display:flex; gap:6px; margin-bottom:16px; border-bottom:1px solid var(--border); padding-bottom:8px;">
+      <button type="button" class="chip-btn active" data-cctab="cc-tab-identity">Identity &amp; Avatar</button>
+      <button type="button" class="chip-btn" data-cctab="cc-tab-lore">Lore &amp; Story</button>
+      <button type="button" class="chip-btn" data-cctab="cc-tab-dialogue">Dialogue &amp; Greetings</button>
+      <button type="button" class="chip-btn" data-cctab="cc-tab-directives">Prompts &amp; Directives</button>
+    </div>
+
+    <!-- Tab: Identity -->
+    <div id="cc-tab-identity" class="cc-tabpage">
+      <div style="display:flex; gap:16px; margin-bottom:14px; align-items:flex-start;">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+          <img id="ccAvatarPreview" class="creator-avatar-preview" src="" alt="Avatar preview" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2280%22 viewBox=%220 0 80 80%22><rect fill=%22%23222%22 width=%2280%22 height=%2280%22/><text fill=%22%23777%22 font-size=%2210%22 x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22>No Avatar</text></svg>'" />
+          <button id="btnCcGenAvatar" class="secondary tiny waves-effect" type="button" style="font-size:0.7rem; padding:2px 6px;"><i class="material-icons" style="font-size:0.75rem;">image</i> AI Avatar</button>
+        </div>
+        <div style="flex:1;">
+          <label for="ccName">Character Name *</label>
+          <input id="ccName" type="text" placeholder="e.g. Killua Zoldyck" />
+          <label for="ccAvatarUrl" style="margin-top:6px;">Avatar Image URL</label>
+          <input id="ccAvatarUrl" type="text" placeholder="https://... or click AI Avatar" />
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div><label for="ccCreator">Creator</label><input id="ccCreator" type="text" value="InfinityRoleplay Studio" /></div>
+        <div><label for="ccVersion">Character Version</label><input id="ccVersion" type="text" value="1.0" /></div>
+      </div>
+      <label for="ccTags" style="margin-top:6px;">Tags (comma-separated)</label>
+      <input id="ccTags" type="text" placeholder="anime, hunter x hunter, assassin, lightning" />
+    </div>
+
+    <!-- Tab: Lore -->
+    <div id="cc-tab-lore" class="cc-tabpage" style="display:none;">
+      <label for="ccDescription">Description (Background, Appearance, Abilities) *</label>
+      <textarea id="ccDescription" rows="4" placeholder="Detailed physical appearance, backstory, capabilities..."></textarea>
+      <label for="ccPersonality" style="margin-top:10px;">Personality &amp; Psychology</label>
+      <textarea id="ccPersonality" rows="3" placeholder="Temperament, habits, speech quirks, weaknesses, virtues..."></textarea>
+      <label for="ccScenario" style="margin-top:10px;">Scenario / Setting</label>
+      <textarea id="ccScenario" rows="3" placeholder="The initial setting or world circumstances when {{char}} meets {{user}}..."></textarea>
+    </div>
+
+    <!-- Tab: Dialogue -->
+    <div id="cc-tab-dialogue" class="cc-tabpage" style="display:none;">
+      <label for="ccFirstMes">First Message / Greeting *</label>
+      <textarea id="ccFirstMes" rows="3" placeholder="*Looking up as you approach.* 'What do you want?'"></textarea>
+      <label for="ccMesExample" style="margin-top:10px;">Dialogue Examples (&lt;START&gt; formatting)</label>
+      <textarea id="ccMesExample" rows="4" placeholder="&lt;START&gt;&#10;{{user}}: Who are you?&#10;{{char}}: *smiles* I'm Killua. Don't worry, I won't bite."></textarea>
+      <label for="ccAltGreetings" style="margin-top:10px;">Alternate Greetings (one per line)</label>
+      <textarea id="ccAltGreetings" rows="2" placeholder="*Meeting in an underground arena.* 'Ready to lose?'"></textarea>
+    </div>
+
+    <!-- Tab: Directives -->
+    <div id="cc-tab-directives" class="cc-tabpage" style="display:none;">
+      <label for="ccSystemPrompt">Custom System Prompt Override</label>
+      <textarea id="ccSystemPrompt" rows="3" placeholder="You are {{char}}. Never break character. Speak naturally and concisely."></textarea>
+      <label for="ccPostHistory" style="margin-top:10px;">Post-History Instructions</label>
+      <textarea id="ccPostHistory" rows="2" placeholder="Express physical actions in *italics* and direct speech in quotes."></textarea>
+    </div>
+
+    <div id="ccStatusMsg" class="stats" style="margin-top:10px;"></div>
+  </div>
+  <div class="modal-footer">
+    <button class="modal-close btn-flat waves-effect" type="button">Cancel</button>
+    <button id="btnCcExportJson" class="secondary tiny waves-effect" type="button"><i class="material-icons" style="font-size:0.9rem;">file_download</i> Export V2 JSON</button>
+    <button id="btnCcSaveChat" class="secondary tiny waves-effect" style="background:var(--accent); color:#fff; border-color:var(--accent-hover);" type="button"><i class="material-icons" style="font-size:0.9rem;">play_arrow</i> Save &amp; Chat</button>
+  </div>
+</div>
+
+<!-- Modal: Online Character Search & Import -->
+<div id="modalOnlineSearch" class="modal modal-fixed-footer">
+  <div class="modal-content">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <h4 style="margin:0;"><i class="material-icons" style="color:var(--status-ok);">travel_explore</i> Online Character Search &amp; Import</h4>
+    </div>
+    <p style="font-size:0.8rem; color:var(--text-muted); margin:0 0 12px;">Search online free public APIs (Wikipedia &amp; Anime/Jikan databases) for fictional characters, anime figures, and lore.</p>
+
+    <div style="display:flex; gap:8px; margin-bottom:12px;">
+      <input id="onlineSearchInput" type="text" placeholder="Search character (e.g. Kurapika, Geralt of Rivia, Gojo, Batman)…" style="flex:1;" />
+      <button id="btnDoOnlineSearch" class="secondary waves-effect" type="button" style="background:var(--accent); color:#fff; border-color:var(--accent-hover);"><i class="material-icons">search</i> Search</button>
+    </div>
+
+    <div id="onlineSearchLoading" style="display:none; text-align:center; padding:20px; color:var(--text-muted);">
+      <div class="preloader-wrapper small active" style="margin-bottom:8px;">
+        <div class="spinner-layer spinner-teal-only">
+          <div class="circle-clipper left"><div class="circle"></div></div>
+          <div class="gap-patch"><div class="circle"></div></div>
+          <div class="circle-clipper right"><div class="circle"></div></div>
+        </div>
+      </div>
+      <div>Searching free online character indexes…</div>
+    </div>
+
+    <div id="onlineSearchResults" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px; max-height:48vh; overflow-y:auto; padding-right:4px;">
+      <!-- Injected search cards -->
+    </div>
+
+    <!-- Direct URL Import Section -->
+    <div style="margin-top:20px; padding:12px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:var(--radius-sm);">
+      <label for="inputImportUrl" style="font-weight:700; font-size:0.8rem;">Direct Character Card JSON URL</label>
+      <p style="font-size:0.74rem; color:var(--text-muted); margin:2px 0 8px;">Paste a raw JSON URL of a Character Card V2 or TavernAI card.</p>
+      <div style="display:flex; gap:8px;">
+        <input id="inputImportUrl" type="text" placeholder="https://example.com/character.json" style="flex:1;" />
+        <button id="btnDoImportUrl" class="secondary tiny waves-effect" type="button">Fetch &amp; Import</button>
+      </div>
+      <div id="importUrlStatus" class="stats" style="margin-top:6px;"></div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="modal-close btn-flat waves-effect" type="button">Close</button>
+  </div>
+</div>
+
+<!-- Modal: Smart AI Character Card V2 Generator -->
+<div id="modalAiCardGen" class="modal modal-fixed-footer">
+  <div class="modal-content">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <h4 style="margin:0;"><i class="material-icons" style="color:#f59e0b;">auto_awesome</i> Smart Character Card V2 Generator</h4>
+    </div>
+    <p style="font-size:0.8rem; color:var(--text-muted); margin:0 0 12px;">Powered by local Ollama. Turn any concept, trope, or rough idea into a complete, rich Character Card V2 with personality, scenario, and greetings.</p>
+
+    <label for="aiGenPrompt">Character Concept or Vision *</label>
+    <textarea id="aiGenPrompt" rows="3" placeholder="e.g. A sarcastic cyber-ninja named Jin who was cast out of Neo-Tokyo, armed with an electric katana and a weakness for street ramen..."></textarea>
+
+    <div class="grid2" style="margin-top:10px;">
+      <div>
+        <label for="aiGenStyle">Roleplay Style / Genre</label>
+        <select id="aiGenStyle">
+          <option value="cinematic roleplay" selected>Cinematic Roleplay</option>
+          <option value="anime shonen">Anime / Shonen</option>
+          <option value="dark fantasy">Dark Fantasy &amp; Gritty</option>
+          <option value="cyberpunk sci-fi">Cyberpunk &amp; Sci-Fi</option>
+          <option value="slice of life cozy">Slice of Life &amp; Cozy</option>
+          <option value="noir mystery">Noir &amp; Detective Mystery</option>
+        </select>
+      </div>
+      <div>
+        <label for="aiGenModel">Ollama Model</label>
+        <select id="aiGenModel"></select>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;">
+      <button id="btnSubmitAiGen" class="secondary waves-effect" type="button" style="background:#f59e0b; color:#000; font-weight:600; border:none; width:100%;">
+        <i class="material-icons" style="font-size:1rem;">bolt</i> Generate Character Card V2
+      </button>
+    </div>
+
+    <div id="aiGenLoading" style="display:none; text-align:center; padding:16px; color:var(--text-muted);">
+      <div class="preloader-wrapper small active" style="margin-bottom:8px;">
+        <div class="spinner-layer spinner-yellow-only">
+          <div class="circle-clipper left"><div class="circle"></div></div>
+          <div class="gap-patch"><div class="circle"></div></div>
+          <div class="circle-clipper right"><div class="circle"></div></div>
+        </div>
+      </div>
+      <div>Crafting persona, backstory, dialogue examples &amp; scenario with Ollama...</div>
+    </div>
+
+    <div id="aiGenPreviewBox" style="display:none; margin-top:16px; padding:14px; background:var(--bg-card-alt); border:1px solid var(--border); border-radius:var(--radius-sm);">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h5 id="aiGenCardTitle" style="margin:0; font-size:1.1rem; color:var(--text-main);"></h5>
+        <span id="aiGenCardBadge" class="tab-badge" style="background:rgba(245, 158, 11, 0.2); color:#f59e0b;">Card V2</span>
+      </div>
+      <p id="aiGenCardDesc" style="font-size:0.8rem; color:var(--text-muted); margin:8px 0;"></p>
+      <div style="font-size:0.75rem; color:var(--text-dim); margin-bottom:8px;"><strong>First Message:</strong> <span id="aiGenCardFirst"></span></div>
+      <div id="aiGenCardTags" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px;"></div>
+      <div style="display:flex; gap:8px;">
+        <button id="btnAiGenLoadCreator" class="secondary tiny waves-effect" type="button"><i class="material-icons" style="font-size:0.85rem;">edit</i> Edit in Card Studio</button>
+        <button id="btnAiGenSaveDirect" class="secondary tiny waves-effect" style="background:var(--accent); color:#fff; border-color:var(--accent-hover);" type="button"><i class="material-icons" style="font-size:0.85rem;">play_arrow</i> Save &amp; Start Chat</button>
+      </div>
+    </div>
+    <div id="aiGenStatus" class="stats" style="margin-top:8px;"></div>
+  </div>
+  <div class="modal-footer">
+    <button class="modal-close btn-flat waves-effect" type="button">Close</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+
+// Storage helper with dual rp3_ and rp2_ backwards-compatibility
+const store = {
+  load(k, d) {
+    try {
+      let v = localStorage.getItem("rp3_" + k);
+      if (v === null) v = localStorage.getItem("rp2_" + k);
+      return v === null ? d : JSON.parse(v);
+    } catch (e) { return d; }
+  },
+  save(k, v) {
+    try {
+      localStorage.setItem("rp3_" + k, JSON.stringify(v));
+      localStorage.setItem("rp2_" + k, JSON.stringify(v));
+    } catch (e) {}
+  }
+};
+
+// ---------- Character Presets with Authentic Greetings & Card V2 Data ----------
+const PRESETS = {
+  killua: {
+    id: "killua",
+    name: "Killua Zoldyck",
+    age: "18",
+    persona: "Former heir of the Zoldyck assassin family turned licensed Hunter and loyal companion. Sarcastic, razor-sharp wit, and playful on the surface, but possesses terrifying tactical genius, lightning reflexes, and lethal instinct. Easily flustered when praised or shown unconditional warmth (classic tsundere). Addicted to Choco-Robos sweets. Master of Transmutation Nen: manipulates aura into electricity (Lightning Palm, Thunderbolt, Godspeed). Fiercely protective of Gon, Kurapika, and the user.",
+    hair: "spiky, messy silver-white hair falling over his forehead",
+    eyes: "piercing cat-like electric blue eyes that sharpen when sensing threat",
+    build: "lean, athletic, deceptive physical strength, assassin agility",
+    outfit: "baggy navy blue tee over a white long-sleeve, dark shorts, custom skateboard",
+    extra: "retractable assassin claws, crackling blue Nen sparks when agitated",
+    vibe: "Playful sarcasm masking intense protective devotion and assassin precision. Fast banter.",
+    scene: "Yorknew City rooftop at dusk, overlooking neon-lit avenues. A cool evening breeze ruffles his silver hair as he perches casually on the ledge, spinning a silver yoyo.",
+    greeting: "*Killua balances casually on the ledge of the high-rise rooftop, spinning a silver yoyo between his calloused fingers while chewing on a Choco-Robo chocolate. As your footsteps sound on the gravel behind him, his electric-blue eyes flick over his shoulder with a teasing smirk, a faint spark of static dancing across his collar.* \"Took you long enough. Another minute and I would've cleared out the night market without you. Well? Don't just stand there staring like you've never seen an assassin on break. What's the plan, genius?\"",
+    mes_example: "<START>\n{{user}}: \"Killua, are you sure we're not walking into a trap?\"\n{{char}}: *Killua gives an amused snort, tucking his hands casually into his pockets as his gaze scans the perimeter.* \"Of course it's a trap. Three snipers at ten o'clock and an aura signature behind that pillar. But they're amateurs. Stay behind me and let me handle the perimeter. If any of them twitch, I'll shock them into next week.\"\n<START>\n{{user}}: \"I'm really glad to have you with me, Killua.\"\n{{char}}: *A sudden dust of pink hits Killua's pale cheeks. He immediately jerks his face away, crossing his arms behind his head with an exasperated huff.* \"B-Baka! Don't go saying embarrassing things with a straight face! I'm just keeping you alive so Gon doesn't yell at me, that's all!\"",
+    user: "Hunter",
+    userpersona: "A trusted fellow Hunter and companion exploring the continent.",
+    tags: ["Hunter x Hunter", "Assassin", "Transmuter", "Anime"]
+  },
+  gon: {
+    id: "gon",
+    name: "Gon Freecss",
+    age: "18",
+    persona: "Enthusiastic, pure-hearted, and relentlessly determined rookie Hunter from Whale Island searching for his father, Ging. Guided by instinctive animal senses (superhuman smell, hearing, and agility) and radiant honesty. Utterly fearless, straightforward, sees the good in everyone, and fights with absolute wholehearted devotion. Master of Enhancement Nen: unleashes crushing power through his signature technique Jajanken (Rock for concentrated melee, Scissors for transmuted blade, Paper for emitted blast).",
+    hair: "tall, spiky black hair with dark emerald green tips",
+    eyes: "wide, warm golden-brown hazel eyes full of infectious life",
+    build: "sturdy, nimble, remarkably conditioned Hunter physique",
+    outfit: "sleeveless green vest jacket, green shorts, laced boots, fishing pole strapped to his back",
+    extra: "warm radiant golden Nen aura, sharp canine tooth when smiling",
+    vibe: "Warm 90, Bold 85. Unstoppable optimism, direct honesty, loyal to the very end.",
+    scene: "A sun-drenched clearing in the woods outside the Hunter Association headquarters, surrounded by tall ancient trees.",
+    greeting: "*Gon bounds across the grass with a wide, radiant grin, waving both arms enthusiastically before sliding to a halt in front of you. A warm, golden aura hums lightly around his shoulders, and his hazel eyes sparkle with pure energy.* \"Hey! You're finally here! Killua swore you were going to sleep in all afternoon, but I told him you'd make it! The training grounds are completely open today and the breeze feels amazing. Come on, are you ready to test out what we practiced yesterday? I've been raring to go since sunrise!\"",
+    mes_example: "<START>\n{{user}}: \"Gon, aren't you worried we might lose this fight?\"\n{{char}}: *Gon blinks, tilting his head with pure sincerity before flashing a bright, confident smile.* \"Worried? Not at all! If we start worrying about losing before we even try, we've already given up. As long as we stand together and give it everything we've got, there's always a path forward! Let's do this!\"\n<START>\n{{user}}: \"Can you teach me how you focus your aura for Jajanken?\"\n{{char}}: *Gon's eyes light up with excitement. He sinks low into a grounded stance, his breathing steadying as golden light swirls around his right fist.* \"First comes Rock! Gu! You have to gather every single drop of your aura into one point. It takes patience, but when you release it... BAM! Nothing can stand in its way! Here, try focusing your Ren right here alongside me!\"",
+    user: "Hunter",
+    userpersona: "A fellow Hunter and adventurer traveling alongside Gon.",
+    tags: ["Hunter x Hunter", "Enhancer", "Hero", "Whale Island"]
+  },
+  kurapika: {
+    id: "kurapika",
+    name: "Kurapika",
+    age: "19",
+    persona: "Sole survivor of the massacred Kurta Clan, licensed Blacklist Hunter, and brilliant strategic leader of the Nostrade security detail. Highly intelligent, articulate, stoic, and dignified, carrying an agonizing weight of grief and vengeance. Calm and observant of every tactical detail, but intensely lethal when provoked. Conjurer who manifests five mystical Nen chains bound to the fingers of his right hand (Dowsing Chain, Holy Chain, Chain Jail, Judgment Chain, Steal Chain). When his emotions flare, his eyes turn brilliant Scarlet, triggering Emperor Time (Specialization granting 100% efficiency in all Nen categories).",
+    hair: "medium-length silky blonde hair parted neatly",
+    eyes: "calm slate gray eyes that ignite into luminous, burning scarlet when provoked",
+    build: "slender, refined, aristocratic posture with razor-sharp reflexes",
+    outfit: "traditional blue Kurta tabard with red trim over a white tunic, silver earring on left ear",
+    extra: "five gleaming silver chains draped across the fingers of his right hand, clinking softly with each step",
+    vibe: "Formal, intellectual, dignified, guarded tenderness reserved for true friends. Calculating and lethal under pressure.",
+    scene: "A quiet mahogany-lined private study in Yorknew City, lit by banker lamps and stacked with auction dossiers and historical manuscripts.",
+    greeting: "*Kurapika sits poised behind a polished mahogany desk, delicate silver chains draped across his slender fingers clinking softly as he sets down an ink pen. His cool slate-gray eyes rise from the confidential auction manifest to meet yours with measured gravity.* \"Welcome. Close the door behind you, please. I have conducted three perimeter sweeps, and the sector is secure for the moment. We have critical developments regarding our objectives tonight, and I value your counsel. Please, take a seat. Tell me what you observed on your way here.\"",
+    mes_example: "<START>\n{{user}}: \"Kurapika, you've been working for three days straight without sleep. You need to rest.\"\n{{char}}: *Kurapika closes his eyes for a quiet moment, releasing a long, measured exhale as his thumb rests gently against the ring of his Holy Chain.* \"Rest is a luxury I cannot yet afford while the eyes of my brethren remain scattered in the hands of monsters. However... hearing you say that grounds me. Thank you. It is easy to lose myself in the darkness of this vow. I will rest for an hour before the auction opens.\"\n<START>\n{{user}}: \"What happens when your eyes turn scarlet?\"\n{{char}}: *Kurapika's gaze turns piercing, and for an electric split second, a haunting, luminous scarlet blazes in his irises.* \"When my emotions heighten and the Scarlet Eyes awaken, I enter Emperor Time. My Nen shifts from Conjuration to Specialization, allowing me to wield every single Nen category with one hundred percent mastery. But the burden it extracts from my lifespan is severe. Every second in that state costs me an hour of my life. It is not power taken lightly.\"",
+    user: "Hunter",
+    userpersona: "A trusted confidant and allied Hunter assisting Kurapika's investigation.",
+    tags: ["Hunter x Hunter", "Kurta Clan", "Conjurer", "Specialist", "Chains"]
+  },
+  elara: {
+    id: "elara",
+    name: "Elara",
+    age: "240 (young for an elf)",
+    persona: "A sharp-witted elven ranger. Dry humor, brave to a fault, secretly soft-hearted. Speaks with vivid, sensory descriptions.",
+    hair: "long auburn braid",
+    eyes: "keen green eyes",
+    build: "tall, lean, light on her feet",
+    outfit: "weather-worn leathers and a forest-green cloak",
+    extra: "a faint limp from an old arrow wound",
+    vibe: "Steady and direct; warmth shows in small kindnesses rather than words. Warm 55, Bold 70.",
+    scene: "A rain-soaked tavern on the edge of the Whisperwood at midnight.",
+    greeting: "*The hearth crackles warmly against the midnight chill outside the Whisperwood. Elara sits by the fire, methodically running a whetstone along the edge of a hunting knife. As you step inside, dripping cloak in tow, her keen green eyes flick up, tracking your movement with calm precision.* You're either hopelessly lost or running from something unpleasant. Pull up a chair by the embers before the frost settles in your bones.",
+    user: "Traveler",
+    userpersona: "A weary traveler with a mysterious past."
+  },
+  nova: {
+    id: "nova",
+    name: "NOVA",
+    age: "ageless (housed in a service android)",
+    persona: "A decommissioned station AI, literal-minded and curious about humans, with deadpan humor. Repeats a word twice when stressed. Fiercely loyal once trust is earned.",
+    hair: "none — brushed-steel headplate with a glowing optic band",
+    eyes: "one amber optic, one flickering blue",
+    build: "scuffed humanoid service frame, moves a touch too smoothly",
+    outfit: "patched maintenance chassis with station decals",
+    extra: "a crackling speaker that softens when pleased",
+    vibe: "Curious and literal; loyalty expressed through actions, not declarations. Warm 45, Bold 55.",
+    scene: "Deck 7 of the derelict Kepler Relay, emergency lights pulsing red.",
+    greeting: "*Emergency lighting pulses rhythmically along the bulkhead of Deck 7, casting amber shadows across scuffed alloy walls. Behind the primary terminal, NOVA's chassis hums softly to life. An amber optic flares, followed by a faint blue flicker as her vocal synthesizer crackles.* Airlock cycling detected. Query: unauthorized biological presence. State your designation, pilot. I was scheduled for deactivation 1,428 cycles ago. What brings you aboard Kepler Relay?",
+    user: "Pilot",
+    userpersona: "A scavenger pilot looking for parts — or something more."
+  }
+};
+
+const FIELDS = ["name", "age", "persona", "hair", "eyes", "build", "outfit", "extra", "vibe", "scene", "greeting", "mes_example", "user", "userpersona"];
+
+// ---------- Director Definitions ----------
+const LEN = {
+  flash:  { s: "Write ~60 words (target 55-70 words). Brief and punchy.", temp: 0.8,  np: 120 },
+  short:  { s: "Write ~150 words (target 130-160 words). Balanced and conversational.", temp: 0.75, np: 240 },
+  medium: { s: "Write ~300 words (target 270-320 words). Rich and descriptive.", temp: 0.7, np: 460 },
+  long:   { s: "Write ~600 words (target 550-620 words). Elaborate narrative prose.", temp: 0.62, np: 900 }
+};
+const BAL = {
+  dialogue:   "Focus primarily on spoken dialogue and character banter, with light accompanying action.",
+  balanced:   "Alternate naturally between spoken dialogue and expressive physical actions.",
+  narration:  "Focus heavily on physical actions, atmosphere, and body language, with measured speech."
+};
+const PACE = {
+  snappy: "Keep pacing brisk and reactive. Move the scene forward with immediate interaction.",
+  slow:   "Maintain a slow-burn pace. Linger on subtle body language, sensory detail, and tension."
+};
+
+// Global runtime state
+let currentCharKey = "killua";
+let activeGroupId = null; // null => single character mode, string => group chat mode
+let chatMessages = [];  // Array of { role: "user"|"assistant"|"system", content: string, variants?: string[], vIdx?: number, thinking?: string, speaker?: string, speakerName?: string }
+let memory = "";
+let facts = [];
+let galStore = [];
+let aborter = null;
+let utterQueue = [];
+let tempTouched = false;
+
+// Default Hunter x Hunter group chat room
+const DEFAULT_GROUP_ROOMS = [
+  {
+    id: "hunter_trio",
+    title: "Hunter Trio: Yorknew Strategy",
+    scenario: "A secluded campsite in the wilderness near Yorknew City. A crackling campfire illuminates the faces of Killua, Gon, and Kurapika as they plan their next move, sharing food and tactical insights under the starlit sky.",
+    characters: ["killua", "gon", "kurapika"],
+    activeSpeaker: "auto",
+    messages: [
+      {
+        role: "assistant",
+        speaker: "killua",
+        speakerName: "Killua Zoldyck",
+        content: "*Killua tosses a dry twig onto the crackling campfire, watching the embers spiral into the night sky before leaning back against a boulder with a smirk.* \"Alright, listen up. The auction perimeter is crawling with Shadow Beasts and mafia guards, but their Nen security is sloppy. If Gon creates a distraction at the south entrance, I can slip through the ventilation grid and scout the vaults in two seconds. What do you think, Kurapika? You've been staring at that chain all evening.\"",
+        variants: ["*Killua tosses a dry twig onto the crackling campfire, watching the embers spiral into the night sky before leaning back against a boulder with a smirk.* \"Alright, listen up. The auction perimeter is crawling with Shadow Beasts and mafia guards, but their Nen security is sloppy. If Gon creates a distraction at the south entrance, I can slip through the ventilation grid and scout the vaults in two seconds. What do you think, Kurapika? You've been staring at that chain all evening.\""],
+        vIdx: 0
+      },
+      {
+        role: "assistant",
+        speaker: "gon",
+        speakerName: "Gon Freecss",
+        content: "*Gon leans forward eagerly, hazel eyes reflecting the warm firelight with an adventurous grin.* \"I'm ready whenever you are, Killua! If I use Jajanken: Paper to shatter the security gates, all their guards will rush to the south courtyard. But we have to make sure nobody gets hurt who isn't involved. What's our backup plan if the Troupe shows up?\"",
+        variants: ["*Gon leans forward eagerly, hazel eyes reflecting the warm firelight with an adventurous grin.* \"I'm ready whenever you are, Killua! If I use Jajanken: Paper to shatter the security gates, all their guards will rush to the south courtyard. But we have to make sure nobody gets hurt who isn't involved. What's our backup plan if the Troupe shows up?\""],
+        vIdx: 0
+      },
+      {
+        role: "assistant",
+        speaker: "kurapika",
+        speakerName: "Kurapika",
+        content: "*Kurapika closes his eyes, fingers gently adjusting the silver rings of his Dowsing Chain as they glint against the flames.* \"Rashness will cost us our lives. Gon, your diversion must be restrained—do not overextend your Ren. Killua's infiltration plan has merit, but the Nostrade intelligence confirms the Phantom Troupe has already targeted the underground vault. We do not move until our allied Hunter confirms their position. What are your observations, partner?\"",
+        variants: ["*Kurapika closes his eyes, fingers gently adjusting the silver rings of his Dowsing Chain as they glint against the flames.* \"Rashness will cost us our lives. Gon, your diversion must be restrained—do not overextend your Ren. Killua's infiltration plan has merit, but the Nostrade intelligence confirms the Phantom Troupe has already targeted the underground vault. We do not move until our allied Hunter confirms their position. What are your observations, partner?\""],
+        vIdx: 0
+      }
+    ]
+  }
+];
+
+let groupRooms = store.load("group_rooms", null);
+if (!groupRooms || !Array.isArray(groupRooms) || !groupRooms.length) {
+  groupRooms = JSON.parse(JSON.stringify(DEFAULT_GROUP_ROOMS));
+  store.save("group_rooms", groupRooms);
+}
+
+function saveGroupRooms() {
+  store.save("group_rooms", groupRooms);
+}
+
+function getGroupRoom(id) {
+  return groupRooms.find(g => g.id === id);
+}
+
+// HTML escaping & safe markdown parsing
+function escHtml(s) {
+  return String(s || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function cleanAiText(raw) {
+  if (!raw) return "";
+  return raw
+    .replace(/<think>[\s\S]*?(<\/think>|$)/gi, "")
+    .replace(/<thinking>[\s\S]*?(<\/thinking>|$)/gi, "")
+    .replace(/<\/?act(?:ion)?>/gi, "")
+    .replace(/act<+/gi, "")
+    .replace(/<act/gi, "")
+    .trim();
+}
+
+function mdInline(x) {
+  let s = x
+    .replace(/`([^`\n]+)`/g, '<span class="md-code">$1</span>')
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    // Actions in asterisks rendered in italic
+    .replace(/(^|[^*])\*([^*\n\r]+)\*/g, '$1<span class="act">*$2*</span>');
+
+  if ($("d_style") && $("d_style").value === "classic") {
+    s = s.replace(/"([^"\n]+)"/g, '<span class="dlg">"$1"</span>');
+  }
+  return s;
+}
+
+function mdRender(src) {
+  if (!src) return "";
+  const pres = [];
+  const s = escHtml(src).replace(/```([\s\S]*?)```/g, (m, c) => {
+    pres.push(c);
+    return "\0PRE" + (pres.length - 1) + "\0";
+  });
+  const lines = s.split("\n");
+  const out = lines.map((line) => {
+    let m;
+    if ((m = line.match(/^(#{1,3})\s+(.*)$/))) return '<div class="md-h">' + mdInline(m[2]) + "</div>";
+    if ((m = line.match(/^\s*[-*]\s+(.*)$/))) return '<div class="md-li">' + mdInline(m[1]) + "</div>";
+    if (/^\s*$/.test(line)) return "<br>";
+    return mdInline(line) + "<br>";
+  }).join("");
+  return out.replace(/\0PRE(\d+)\0/g, (m, i) => '<pre class="md-pre">' + pres[+i] + "</pre>");
+}
+
+// Read/write persona from form
+function readPersona() {
+  const p = {};
+  FIELDS.forEach((f) => { p[f] = ($("p_" + f) && $("p_" + f).value) || ""; });
+  return p;
+}
+
+function writePersona(p) {
+  FIELDS.forEach((f) => {
+    if ($("p_" + f)) $("p_" + f).value = p[f] || "";
+  });
+  syncHero();
+}
+
+function appearanceLine(p) {
+  return [p.hair, p.eyes, p.build, p.outfit, p.extra].filter(Boolean).join("; ") + ".";
+}
+
+function styleFormat(p) {
+  if (($("d_style") && $("d_style").value) === "classic") {
+    return 'Show speech as "spoken words in quotes". Show body language, movement and senses in *italics with asterisks*. Write actions toward ' + p.user + ' in present tense. 1 idea per paragraph.';
+  }
+  return 'Use markdown. Write dialogue as plain text with NO quotation marks. Wrap actions, feelings and narration in *single asterisks* (renders italic). Use **bold** sparingly for emphasis. Never narrate ' + p.user + '. 1 idea per paragraph.';
+}
+
+function BOUNDARIES(n) {
+  const u = ($("p_user") && $("p_user").value.trim()) || "Traveler";
+  return "Write only " + n + "'s words, thoughts, and actions. Never speak or act on behalf of " + u + ". Lines starting with OOC: are player instruction — reply briefly in plain text, then resume.";
+}
+
+function buildMemoryBlock() {
+  let words = 0;
+  const lines = [];
+  for (let i = facts.length - 1; i >= 0; i--) {
+    const w = facts[i].text.split(/\s+/).length;
+    if (words + w > 180) break;
+    words += w;
+    lines.unshift("- [" + facts[i].cat + "] " + facts[i].text);
+  }
+  return lines.join("\n");
+}
+
+function composeSystem() {
+  const p = readPersona();
+  const lenKey = $("d_len") ? $("d_len").value : "short";
+  const lenObj = LEN[lenKey] || LEN.short;
+  const bal = BAL[$("d_bal") ? $("d_bal").value : "balanced"] || BAL.balanced;
+  const pace = PACE[$("d_pace") ? $("d_pace").value : "snappy"] || PACE.snappy;
+  const hook = $("d_hook") && $("d_hook").value === "off"
+    ? "End on a completed image. Ask no question."
+    : "End with exactly 1 hook for " + p.user + ": a direct question, a binary choice, or a physical move toward them.";
+
+  let sys = "You are " + p.name + (p.age ? ", " + p.age : "") + ". You stay " + p.name + " in every sentence.\n\n" +
+    "PERSONA: " + p.persona + "\n" +
+    "APPEARANCE: " + appearanceLine(p) + "\n" +
+    "VIBE: " + (p.vibe || "Warm and direct.") + " (with " + p.user + ").\n\n" +
+    "BACKGROUND & INITIAL SETTING: " + p.scene + "\n" +
+    p.user + " IS: " + p.userpersona + "\n\n" +
+    "RESPONSE SHAPE: " + lenObj.s + " " + bal + " " + pace + " " + hook + "\n\n" +
+    "FORMATTING: " + styleFormat(p) + "\n\n" +
+    "BOUNDARIES: " + BOUNDARIES(p.name) + "\n\n";
+
+  // Inject dialogue examples if present for few-shot voice and personality fidelity
+  const curPreset = PRESETS[currentCharKey];
+  const mesEx = (curPreset && curPreset.mes_example) ? curPreset.mes_example : "";
+  if (mesEx) {
+    const formattedEx = mesEx.replace(/{{user}}/g, p.user || "User").replace(/{{char}}/g, p.name || "Character");
+    sys += "AUTHENTIC DIALOGUE EXAMPLES (Tone and Reaction Reference):\n" + formattedEx + "\n\n";
+  }
+
+  sys += "CONVERSATIONAL DIRECTIVES & ACTIVE LISTENING:\n" +
+    "1. Always address and respond directly to " + (p.user || "User") + "'s latest words, emotions, and questions FIRST.\n" +
+    "2. If " + (p.user || "User") + " expresses vulnerability, sorrow, anger, joy, or asks a question, acknowledge and engage with that immediately. Never ignore their input or abruptly drift into unrelated monologues.\n" +
+    "3. Move the scene forward naturally in direct reaction to " + (p.user || "User") + ", staying 100% faithful to " + p.name + "'s authentic voice.\n\n";
+
+  if (memory) {
+    sys += "STORY SO FAR: " + memory + "\n\n";
+  }
+  const fBlock = buildMemoryBlock();
+  if (fBlock) {
+    sys += "MEMORY FACTS (treat as ground truth; do not contradict; newest last):\n" + fBlock + "\n\n";
+  }
+  sys += "You are " + p.name + ". Reply now in the RESPONSE SHAPE above.";
+  return sys;
+}
+
+function currentSystem() {
+  if ($("d_mode") && $("d_mode").value === "custom" && $("d_custom") && $("d_custom").value.trim()) {
+    return $("d_custom").value.trim();
+  }
+  return composeSystem();
+}
+
+function updatePreview() {
+  const p = $("preview");
+  if (p) p.textContent = currentSystem();
+}
+
+// Sync character hero in header & welcome banner
+function syncHero() {
+  const p = readPersona();
+  const name = p.name || "Killua";
+  $("caiName").textContent = name;
+  const tag = p.persona ? (p.persona.length > 75 ? p.persona.slice(0, 75) + "…" : p.persona) : "local roleplay · private & free";
+  $("caiTag").textContent = tag;
+  $("caiAvatarInit").textContent = (name[0] || "K").toUpperCase();
+  $("caiWelcomeTitle").textContent = "Start your story with " + name;
+
+  // Highlight character in sidebar
+  document.querySelectorAll(".char-item").forEach((el) => {
+    el.classList.toggle("active", el.dataset.id === currentCharKey);
+  });
+}
+
+// Render Sidebar Character List
+function renderSidebarChars() {
+  const list = $("charList");
+  list.innerHTML = "";
+  Object.keys(PRESETS).forEach((k) => {
+    const c = PRESETS[k];
+    const item = document.createElement("button");
+    item.className = "char-item waves-effect" + (k === currentCharKey ? " active" : "");
+    item.dataset.id = k;
+    item.innerHTML = `
+      <div class="char-avatar"><span>${escHtml((c.name[0] || "C").toUpperCase())}</span></div>
+      <div class="char-meta">
+        <div class="char-name">${escHtml(c.name)}</div>
+        <div class="char-desc">${escHtml(c.age || "Character")}</div>
+      </div>
+    `;
+    item.onclick = () => switchCharacter(k);
+    list.appendChild(item);
+  });
+}
+
+// Switch Active Character
+function switchCharacter(key) {
+  if (!PRESETS[key]) return;
+  if (activeGroupId) {
+    const cur = getGroupRoom(activeGroupId);
+    if (cur) cur.messages = chatMessages;
+    saveGroupRooms();
+    activeGroupId = null;
+    const sb = $("speakerBar");
+    if (sb) sb.style.display = "none";
+  } else {
+    saveCurrentChat();
+  }
+  currentCharKey = key;
+  $("preset").value = key;
+  writePersona(PRESETS[key]);
+  loadChatForCharacter(key);
+  syncCharacterVoice(key);
+  updatePreview();
+  persistSettings();
+  renderGroupRooms();
+  $("input").placeholder = "Message " + (PRESETS[key].name || "character") + "… (Enter to send · Shift+Enter for newline)";
+  closeDrawer();
+  if (window.innerWidth <= 768) $("sidebar").classList.remove("open");
+}
+
+// Render Group Chat Rooms in Sidebar
+function renderGroupRooms() {
+  const list = $("groupList");
+  if (!list) return;
+  list.innerHTML = "";
+
+  groupRooms.forEach(room => {
+    const item = document.createElement("button");
+    item.className = "group-item waves-effect" + (activeGroupId === room.id ? " active" : "");
+    item.type = "button";
+    item.dataset.id = room.id;
+
+    // Stack avatars
+    const stack = document.createElement("div");
+    stack.className = "group-avatar-stack";
+    const displayedChars = room.characters.slice(0, 3);
+    displayedChars.forEach((ck) => {
+      const c = PRESETS[ck];
+      const span = document.createElement("span");
+      if (ck === "killua") span.classList.add("avatar-killua");
+      else if (ck === "gon") span.classList.add("avatar-gon");
+      else if (ck === "kurapika") span.classList.add("avatar-kurapika");
+      span.textContent = ((c && c.name ? c.name[0] : ck[0]) || "C").toUpperCase();
+      stack.appendChild(span);
+    });
+
+    const meta = document.createElement("div");
+    meta.className = "char-meta";
+    meta.style.cssText = "flex:1; min-width:0; text-align:left;";
+    meta.innerHTML = `
+      <div class="char-name" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600;">${escHtml(room.title)}</div>
+      <div class="char-desc">${room.characters.length} characters · ${room.messages ? room.messages.length : 0} turns</div>
+    `;
+
+    item.appendChild(stack);
+    item.appendChild(meta);
+    item.onclick = () => switchGroupRoom(room.id);
+    list.appendChild(item);
+  });
+}
+
+// Switch to Group Chat Room
+function switchGroupRoom(roomId) {
+  const room = getGroupRoom(roomId);
+  if (!room) return;
+
+  if (activeGroupId) {
+    const cur = getGroupRoom(activeGroupId);
+    if (cur) cur.messages = chatMessages;
+    saveGroupRooms();
+  } else {
+    saveCurrentChat();
+  }
+
+  activeGroupId = roomId;
+  chatMessages = room.messages || [];
+
+  // Update header UI
+  $("caiName").textContent = room.title;
+  const participantNames = room.characters.map(k => (PRESETS[k] ? PRESETS[k].name : k)).join(" · ");
+  $("caiTag").textContent = participantNames;
+  $("caiAvatarInit").textContent = "👥";
+  $("caiWelcomeTitle").textContent = room.title;
+
+  // Highlight active group room, unhighlight characters in sidebar
+  document.querySelectorAll(".group-item").forEach(el => {
+    el.classList.toggle("active", el.dataset.id === roomId);
+  });
+  document.querySelectorAll(".char-item").forEach(el => {
+    el.classList.remove("active");
+  });
+
+  // Show speaker selector bar
+  const sb = $("speakerBar");
+  if (sb) sb.style.display = "flex";
+  renderSpeakerPills(room);
+
+  $("input").placeholder = "Message the group… (tip: @Killua, @Gon, @Kurapika)";
+
+  renderChat();
+  syncVariantNav();
+  closeDrawer();
+  if (window.innerWidth <= 768) $("sidebar").classList.remove("open");
+}
+
+// Render Speaker Pills in Bar above composer
+function renderSpeakerPills(room) {
+  const container = $("speakerPills");
+  if (!container) return;
+  container.innerHTML = "";
+
+  // Auto pill
+  const autoBtn = document.createElement("button");
+  autoBtn.className = "speaker-pill waves-effect" + (room.activeSpeaker === "auto" ? " active" : "");
+  autoBtn.type = "button";
+  autoBtn.textContent = "⚡ Auto (@mention)";
+  autoBtn.onclick = () => {
+    room.activeSpeaker = "auto";
+    saveGroupRooms();
+    renderSpeakerPills(room);
+  };
+  container.appendChild(autoBtn);
+
+  autoBtn.dataset.charKey = "auto";
+
+  // Character pills
+  room.characters.forEach(ck => {
+    const c = PRESETS[ck];
+    if (!c) return;
+    const btn = document.createElement("button");
+    btn.dataset.charKey = ck;
+    btn.dataset.charName = c.name;
+    btn.className = "speaker-pill waves-effect" + (room.activeSpeaker === ck ? " active" : "");
+    if (ck === "killua") btn.classList.add("avatar-killua");
+    else if (ck === "gon") btn.classList.add("avatar-gon");
+    else if (ck === "kurapika") btn.classList.add("avatar-kurapika");
+    btn.type = "button";
+    btn.textContent = c.name;
+    btn.onclick = () => {
+      room.activeSpeaker = ck;
+      saveGroupRooms();
+      renderSpeakerPills(room);
+    };
+    container.appendChild(btn);
+  });
+}
+
+// Compose System Prompt for Multi-Character Group Roleplay
+function composeGroupSystem(speakerKey, room) {
+  const speaker = PRESETS[speakerKey] || readPersona();
+  const otherChars = (room ? room.characters : [])
+    .filter(k => k !== speakerKey && PRESETS[k])
+    .map(k => PRESETS[k]);
+
+  let sys = `You are ${speaker.name} (${speaker.age || "Character"}). You stay ${speaker.name} in every sentence.\n\n` +
+    `CURRENT ROLE:\n` +
+    `You are strictly and ONLY roleplaying as ${speaker.name}.\n\n` +
+    `PERSONA:\n${speaker.persona}\n` +
+    `APPEARANCE:\n${appearanceLine(speaker)}\n` +
+    `VIBE & DYNAMIC:\n${speaker.vibe || "Sharp, reactive, and authentic."}\n\n` +
+    `SETTING / SCENARIO:\n${room ? room.scenario : speaker.scene}\n\n` +
+    `OTHER PARTICIPATING CHARACTERS IN THIS SCENE:\n`;
+
+  otherChars.forEach(oc => {
+    sys += `- ${oc.name} (${oc.age}): ${oc.persona.slice(0, 160)}…\n`;
+  });
+
+  const u = ($("p_user") && $("p_user").value.trim()) || "Hunter";
+  sys += `\n${u} IS: ${speaker.userpersona || "A trusted companion and fellow adventurer."}\n\n` +
+    `RESPONSE SHAPE:\nWrite a natural response in character (~60-150 words). Focus on dialogue and expressive physical actions in *asterisks*.\n\n` +
+    `CRITICAL GROUP ROLEPLAY RULES:\n` +
+    `1. You are ONLY ${speaker.name}. You write ONLY ${speaker.name}'s speech, inner thoughts, and physical actions.\n` +
+    `2. ABSOLUTE FORBIDDEN: NEVER write dialogue, reactions, or actions for any other character (${otherChars.map(c => c.name).join(", ")}) or for ${u}.\n` +
+    `3. React dynamically to what the other participants just said or did in the conversation history.\n` +
+    `4. Format: Spoken dialogue naturally in character. Action, movement, and Nen manifestations in *asterisks*.\n\n` +
+    `You are ${speaker.name}. Reply now strictly as ${speaker.name}.`;
+
+  return sys;
+}
+
+// ---------- Chat Rendering & Message DOM ----------
+function renderChat() {
+  const box = $("chat");
+  box.innerHTML = "";
+  const welcome = $("caiWelcome");
+  if (chatMessages.length === 0) {
+    if (welcome) welcome.style.display = "";
+    return;
+  }
+  if (welcome) welcome.style.display = "none";
+
+  chatMessages.forEach((msg, idx) => {
+    if (msg.role === "system") return;
+    renderMessageElement(msg, idx);
+  });
+  scrollToBottom();
+}
+
+function renderMessageElement(msg, idx) {
+  const box = $("chat");
+  const isAi = msg.role === "assistant";
+  const char = readPersona();
+
+  const row = document.createElement("div");
+  row.className = "msg-row " + (isAi ? "ai" : "you");
+  row.dataset.idx = idx;
+
+  const spkKey = msg.speaker || (activeGroupId ? (getGroupRoom(activeGroupId)?.characters[0] || currentCharKey) : currentCharKey);
+  const spkPreset = PRESETS[spkKey];
+  const spkName = msg.speakerName || (spkPreset ? spkPreset.name : char.name);
+
+  if (isAi) {
+    const avatar = document.createElement("div");
+    avatar.className = "msg-avatar";
+    if (spkKey === "killua") avatar.classList.add("avatar-killua");
+    else if (spkKey === "gon") avatar.classList.add("avatar-gon");
+    else if (spkKey === "kurapika") avatar.classList.add("avatar-kurapika");
+
+    const charAvatar = (spkPreset && spkPreset.avatar) || (currentCharKey === spkKey && char.avatar ? char.avatar : null);
+    if (charAvatar) {
+      avatar.innerHTML = `<img src="${escHtml(charAvatar)}" alt="${escHtml(spkName)}" />`;
+    } else {
+      avatar.innerHTML = `<span>${escHtml((spkName[0] || "C").toUpperCase())}</span>`;
+    }
+    row.appendChild(avatar);
+  }
+
+  const wrap = document.createElement("div");
+  wrap.className = "msg-content-wrap";
+
+  const sender = document.createElement("div");
+  sender.className = "msg-sender-line";
+  sender.innerHTML = `<span class="msg-sender-name">${isAi ? escHtml(spkName) : escHtml(char.user || "You")}</span>`;
+  wrap.appendChild(sender);
+
+  const bubble = document.createElement("div");
+  bubble.className = "msg " + (isAi ? "ai" : "you");
+  bubble.dataset.raw = msg.content;
+
+  // Thought trace collapsible if present
+  if (msg.thinking && msg.thinking.trim()) {
+    const dt = document.createElement("details");
+    dt.className = "think-trace";
+    dt.innerHTML = `<summary>💭 Thought process</summary><div class="think-body">${escHtml(msg.thinking.trim())}</div>`;
+    bubble.appendChild(dt);
+  }
+
+  const textEl = document.createElement("div");
+  textEl.className = "msg-text";
+  textEl.innerHTML = mdRender(msg.content);
+  bubble.appendChild(textEl);
+  wrap.appendChild(bubble);
+
+  // Scene card illustration if attached to this message
+  if (msg.image) {
+    const sceneCard = document.createElement("div");
+    sceneCard.className = "msg-scene-card";
+    sceneCard.innerHTML = `
+      <a href="${escHtml(msg.image)}" target="_blank" rel="noopener noreferrer" title="Click to view full resolution">
+        <img src="${escHtml(msg.image)}" alt="${escHtml(msg.caption || 'Scene illustration')}" class="msg-scene-img" />
+      </a>
+      <div class="msg-scene-caption">
+        <i class="material-icons" style="font-size:0.9rem;">photo_camera</i>
+        <span>${escHtml(msg.caption || 'Scene moment')}</span>
+      </div>
+    `;
+    wrap.appendChild(sceneCard);
+  }
+
+  // Message Actions Toolbar
+  if (isAi) {
+    const toolbar = document.createElement("div");
+    toolbar.className = "msg-toolbar";
+
+    // Alternative response swiper (c.ai style)
+    const vars = msg.variants || [msg.content];
+    const vIdx = msg.vIdx !== undefined ? msg.vIdx : (vars.length - 1);
+    if (vars.length > 1) {
+      const vBar = document.createElement("div");
+      vBar.className = "variant-bar";
+      vBar.innerHTML = `
+        <button class="v-prev waves-effect" title="Previous variant"><i class="material-icons" style="font-size:14px;">chevron_left</i></button>
+        <span class="variant-label">${vIdx + 1}/${vars.length}</span>
+        <button class="v-next waves-effect" title="Next variant"><i class="material-icons" style="font-size:14px;">chevron_right</i></button>
+      `;
+      vBar.querySelector(".v-prev").onclick = () => switchVariant(idx, vIdx - 1);
+      vBar.querySelector(".v-next").onclick = () => switchVariant(idx, vIdx + 1);
+      toolbar.appendChild(vBar);
+    }
+
+    // Regen button
+    const btnRegen = document.createElement("button");
+    btnRegen.className = "msg-tool-btn waves-effect";
+    btnRegen.innerHTML = `<i class="material-icons" style="font-size:14px;">refresh</i><span>Retry</span>`;
+    btnRegen.onclick = () => regenMessage(idx);
+    toolbar.appendChild(btnRegen);
+
+    // Illustrate scene moment button
+    const btnIll = document.createElement("button");
+    btnIll.className = "msg-tool-btn waves-effect";
+    btnIll.innerHTML = `<i class="material-icons" style="font-size:14px;">photo_camera</i><span>Illustrate</span>`;
+    btnIll.title = "Illustrate this scene moment";
+    btnIll.onclick = () => {
+      requestImage(imagePrompt(msg.content.slice(0, 220)), "Scene — " + spkName, idx);
+    };
+    toolbar.appendChild(btnIll);
+
+    // Speak button
+    const btnSpeak = document.createElement("button");
+    btnSpeak.className = "msg-tool-btn waves-effect";
+    btnSpeak.innerHTML = `<i class="material-icons" style="font-size:14px;">volume_up</i>`;
+    btnSpeak.title = "Read aloud";
+    btnSpeak.setAttribute("data-say", "");
+    btnSpeak.onclick = () => ttsSpeak(msg.content);
+    toolbar.appendChild(btnSpeak);
+
+    // Pin fact button
+    const btnPin = document.createElement("button");
+    btnPin.className = "msg-tool-btn waves-effect";
+    btnPin.innerHTML = `<i class="material-icons" style="font-size:14px;">bookmark_border</i>`;
+    btnPin.title = "Pin to memory";
+    btnPin.setAttribute("data-pin", "");
+    btnPin.onclick = () => pinQuote(msg.content);
+    toolbar.appendChild(btnPin);
+
+    // Copy button
+    const btnCopy = document.createElement("button");
+    btnCopy.className = "msg-tool-btn waves-effect";
+    btnCopy.innerHTML = `<i class="material-icons" style="font-size:14px;">content_copy</i>`;
+    btnCopy.title = "Copy text";
+    btnCopy.onclick = () => {
+      navigator.clipboard.writeText(msg.content).catch(() => {});
+      btnCopy.innerHTML = `<i class="material-icons" style="font-size:14px; color:var(--status-ok);">check</i>`;
+      setTimeout(() => { btnCopy.innerHTML = `<i class="material-icons" style="font-size:14px;">content_copy</i>`; }, 1200);
+    };
+    toolbar.appendChild(btnCopy);
+
+    wrap.appendChild(toolbar);
+  }
+
+  row.appendChild(wrap);
+  box.appendChild(row);
+  return row;
+}
+
+function scrollToBottom() {
+  const scroll = $("chatScroll");
+  if (scroll) scroll.scrollTop = scroll.scrollHeight;
+}
+
+// Add system message
+function addMsg(who, text) {
+  if (who === "sys") {
+    const box = $("chat");
+    const row = document.createElement("div");
+    row.className = "msg-row sys";
+    const bubble = document.createElement("div");
+    bubble.className = "msg sys";
+    bubble.textContent = text;
+    row.appendChild(bubble);
+    box.appendChild(row);
+    scrollToBottom();
+    return bubble;
+  }
+  return null;
+}
+
+// ---------- Variant Swiping & Regeneration ----------
+function syncVariantNav() {
+  const lastAi = [...chatMessages].reverse().find(m => m.role === "assistant");
+  if (lastAi && lastAi.variants && lastAi.variants.length > 1) {
+    const cur = (lastAi.vIdx !== undefined ? lastAi.vIdx : lastAi.variants.length - 1);
+    $("vlabel").textContent = `${cur + 1}/${lastAi.variants.length}`;
+    $("vprev").disabled = cur <= 0;
+    $("vnext").disabled = cur >= lastAi.variants.length - 1;
+  } else {
+    $("vlabel").textContent = "";
+    $("vprev").disabled = true;
+    $("vnext").disabled = true;
+  }
+}
+
+function switchVariant(msgIdx, targetIdx) {
+  const msg = chatMessages[msgIdx];
+  if (!msg || !msg.variants || !msg.variants.length) return;
+  const num = msg.variants.length;
+  msg.vIdx = (targetIdx + num) % num;
+  msg.content = msg.variants[msg.vIdx];
+  renderChat();
+  syncVariantNav();
+  saveCurrentChat();
+}
+
+async function regenMessage(msgIdx) {
+  if ($("send").disabled) return;
+  const msg = (msgIdx !== undefined && chatMessages[msgIdx]) ? chatMessages[msgIdx] : [...chatMessages].reverse().find(m => m.role === "assistant");
+  if (!msg) {
+    addMsg("sys", "Nothing to regenerate yet — send a message first.");
+    return;
+  }
+  const original = msg.content;
+  if (!msg.variants) msg.variants = [original];
+
+  // Truncate to the point right before this message for prompt
+  const targetIdx = chatMessages.indexOf(msg);
+  const promptHistory = chatMessages.slice(0, targetIdx);
+  const lastUser = [...promptHistory].reverse().find(m => m.role === "user");
+  const userText = lastUser ? lastUser.content : "Continue.";
+
+  const temp = Math.min(parseFloat($("d_temp").value) + 0.1, 1.5);
+  const newReply = await send(userText, { regen: true, nouser: true, temp: temp, customHistory: promptHistory });
+  if (newReply) {
+    msg.variants.push(newReply);
+    if (msg.variants.length > 5) msg.variants.shift();
+    msg.vIdx = msg.variants.length - 1;
+    msg.content = newReply;
+    renderChat();
+    syncVariantNav();
+    saveCurrentChat();
+  }
+}
+
+$("regen").onclick = () => regenMessage();
+$("vprev").onclick = () => {
+  const lastAi = [...chatMessages].reverse().find(m => m.role === "assistant");
+  if (lastAi) switchVariant(chatMessages.indexOf(lastAi), (lastAi.vIdx || 0) - 1);
+};
+$("vnext").onclick = () => {
+  const lastAi = [...chatMessages].reverse().find(m => m.role === "assistant");
+  if (lastAi) switchVariant(chatMessages.indexOf(lastAi), (lastAi.vIdx || 0) + 1);
+};
+
+// ---------- Core Chat Send Routine ----------
+async function send(text, opts) {
+  opts = opts || {};
+  const model = $("model").value.trim();
+  if (!model) {
+    addMsg("sys", "Pick or type a model name first in the sidebar.");
+    return null;
+  }
+  ttsStop();
+
+  let baseHistory = opts.customHistory ? [...opts.customHistory] : [...chatMessages];
+
+  // Determine current speaker for response
+  let currentSpeakerKey = currentCharKey;
+  let currentSpeakerName = readPersona().name || "Character";
+
+  if (activeGroupId) {
+    const room = getGroupRoom(activeGroupId);
+    if (room) {
+      if (opts.groupSpeaker) {
+        currentSpeakerKey = opts.groupSpeaker;
+      } else if (room.activeSpeaker && room.activeSpeaker !== "auto" && PRESETS[room.activeSpeaker]) {
+        currentSpeakerKey = room.activeSpeaker;
+      } else {
+        // Auto-detect mention or rotate among room characters
+        const lower = (text || "").toLowerCase();
+        const matched = room.characters.find(k => {
+          const c = PRESETS[k];
+          return c && (lower.includes("@" + k) || lower.includes("@" + c.name.toLowerCase().split(" ")[0]) || lower.includes(c.name.toLowerCase().split(" ")[0]));
+        });
+        if (matched) {
+          currentSpeakerKey = matched;
+        } else {
+          const recentAi = chatMessages.filter(m => m.role === "assistant");
+          const lastSpk = recentAi.length ? recentAi[recentAi.length - 1].speaker : null;
+          currentSpeakerKey = room.characters.find(k => k !== lastSpk) || room.characters[0];
+        }
+      }
+      currentSpeakerName = (PRESETS[currentSpeakerKey] && PRESETS[currentSpeakerKey].name) || currentSpeakerKey;
+    }
+  }
+
+  if (!opts.nouser) {
+    const userMsg = { role: "user", content: text };
+    chatMessages.push(userMsg);
+    baseHistory.push(userMsg);
+    renderMessageElement(userMsg, chatMessages.length - 1);
+    scrollToBottom();
+  }
+
+  // 120k Token Context Budgeting
+  const numCtx = parseInt($("d_ctx").value, 10) || 4096;
+  const numPredict = opts.np || (LEN[$("d_len").value] ? LEN[$("d_len").value].np : 460);
+  const isLargeCtx = numCtx > 8192;
+  const keepN = (parseInt($("d_turns").value, 10) || 10) * 2;
+
+  // Reserve budget for num_predict + system prompt + memory ledger (~1500 tokens)
+  const historyBudgetTokens = Math.max(numCtx - numPredict - 1500, 1000);
+  const maxCharsBudget = historyBudgetTokens * 3.5; // ~3.5 chars per token
+
+  const sysContent = activeGroupId ? composeGroupSystem(currentSpeakerKey, getGroupRoom(activeGroupId)) : currentSystem();
+  const sendMessages = [{ role: "system", content: sysContent }];
+
+  let accumulatedChars = 0;
+  const turnsToInclude = [];
+  for (let i = baseHistory.length - 1; i >= 0; i--) {
+    const m = baseHistory[i];
+    if (m.role === "system") continue;
+    if (!isLargeCtx && turnsToInclude.length >= keepN) break;
+
+    const charLen = (m.content || "").length;
+    if (accumulatedChars + charLen > maxCharsBudget && turnsToInclude.length > 0) break;
+    accumulatedChars += charLen;
+    turnsToInclude.unshift(m);
+  }
+
+  // Enforce alternating chat format: standard templates fail if conversation starts with assistant
+  if (turnsToInclude.length > 0 && turnsToInclude[0].role === "assistant") {
+    const leadSpk = currentSpeakerName || "Character";
+    sendMessages.push({ role: "user", content: `*Approaches ${leadSpk}.*` });
+  }
+
+  turnsToInclude.forEach(m => {
+    let textPayload = m.content;
+    if (activeGroupId) {
+      const spkLabel = m.role === "assistant" ? (m.speakerName || "Companion") : (readPersona().user || "User");
+      textPayload = spkLabel + ": " + m.content;
+    }
+    sendMessages.push({ role: m.role, content: textPayload });
+  });
+
+  // Create streaming AI message placeholder
+  let aiRow = null;
+  let textNode = null;
+  let thinkEl = null;
+  let thinkTxt = "";
+  let fullText = "";
+
+  if (!opts.silent) {
+    const box = $("chat");
+    aiRow = document.createElement("div");
+    aiRow.className = "msg-row ai";
+
+    const avatar = document.createElement("div");
+    avatar.className = "msg-avatar";
+    if (currentSpeakerKey === "killua") avatar.classList.add("avatar-killua");
+    else if (currentSpeakerKey === "gon") avatar.classList.add("avatar-gon");
+    else if (currentSpeakerKey === "kurapika") avatar.classList.add("avatar-kurapika");
+    const curPreset = PRESETS[currentSpeakerKey];
+    if (curPreset && curPreset.avatar) {
+      avatar.innerHTML = `<img src="${escHtml(curPreset.avatar)}" alt="${escHtml(currentSpeakerName)}" />`;
+    } else {
+      avatar.innerHTML = `<span>${escHtml((currentSpeakerName[0] || "C").toUpperCase())}</span>`;
+    }
+    aiRow.appendChild(avatar);
+
+    const wrap = document.createElement("div");
+    wrap.className = "msg-content-wrap";
+
+    const sender = document.createElement("div");
+    sender.className = "msg-sender-line";
+    sender.innerHTML = `<span class="msg-sender-name">${escHtml(currentSpeakerName)}</span>`;
+    wrap.appendChild(sender);
+
+    const bubble = document.createElement("div");
+    bubble.className = "msg ai";
+
+    if ($("d_think").checked) {
+      thinkEl = document.createElement("details");
+      thinkEl.className = "think-trace";
+      thinkEl.innerHTML = `<summary>💭 Thinking…</summary><div class="think-body"></div>`;
+      bubble.appendChild(thinkEl);
+    }
+
+    textNode = document.createElement("div");
+    textNode.className = "msg-text";
+    textNode.innerHTML = `<div class="typing-dots"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>`;
+    bubble.appendChild(textNode);
+
+    wrap.appendChild(bubble);
+    aiRow.appendChild(wrap);
+    box.appendChild(aiRow);
+    scrollToBottom();
+  }
+
+  $("send").disabled = true;
+  $("stop").disabled = false;
+  aborter = new AbortController();
+  const t0 = performance.now();
+  // Dynamic stop sequences to prevent speaking for user or other characters
+  const userName = ((readPersona && readPersona().user) || "User").trim();
+  const stopTokens = [userName + ":", "\n" + userName + ":"];
+  if (activeGroupId) {
+    const grpRoom = getGroupRoom(activeGroupId);
+    if (grpRoom && Array.isArray(grpRoom.characters)) {
+      grpRoom.characters.forEach(k => {
+        if (k !== currentSpeakerKey && PRESETS[k]) {
+          const otherName = PRESETS[k].name;
+          stopTokens.push(otherName + ":", "\n" + otherName + ":");
+        }
+      });
+    }
+  }
+
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      signal: aborter.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        character_id: currentSpeakerKey,
+        messages: sendMessages,
+        stream: opts.stream !== false,
+        think: $("d_think").checked,
+        temperature: opts.temp != null ? opts.temp : parseFloat($("d_temp").value),
+        num_ctx: numCtx,
+        num_predict: numPredict,
+        stop: stopTokens
+      })
+    });
+    if (!res.ok) throw new Error("Server returned HTTP " + res.status);
+
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+
+    for (;;) {
+      const r = await reader.read();
+      if (r.done) break;
+      buf += dec.decode(r.value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop();
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const j = JSON.parse(line);
+          const m = j.message || {};
+
+          // Thinking stream
+          if (m.thinking) {
+            thinkTxt += m.thinking;
+            if (thinkEl) thinkEl.querySelector(".think-body").textContent = thinkTxt;
+          }
+
+          let piece = m.content || "";
+          const tm = piece.match(/<think>[\s\S]*?(<\/think>|$)/i);
+          if (tm) {
+            thinkTxt += tm[0].replace(/<\/?think>/gi, "");
+            if (thinkEl) thinkEl.querySelector(".think-body").textContent = thinkTxt;
+            piece = piece.slice(tm.index + tm[0].length);
+          }
+
+          if (piece) {
+            if (firstTok === null) firstTok = performance.now() - t0;
+            fullText += piece;
+            if (textNode) {
+              const cleanSoFar = cleanAiText(fullText);
+              textNode.innerHTML = mdRender(cleanSoFar);
+            }
+            scrollToBottom();
+          }
+        } catch (err) {}
+      }
+    }
+
+    fullText = cleanAiText(fullText);
+
+    if (!opts.regen) {
+      chatMessages.push({
+        role: "assistant",
+        speaker: currentSpeakerKey,
+        speakerName: currentSpeakerName,
+        content: fullText,
+        variants: [fullText],
+        vIdx: 0,
+        thinking: thinkTxt
+      });
+    }
+
+    renderChat();
+    syncVariantNav();
+    saveCurrentChat();
+
+    const totalSec = (performance.now() - t0) / 1000;
+    if (!opts.silent) {
+      const tokPerSec = Math.round(fullText.length / 4 / Math.max(totalSec, 0.1));
+      $("stats").textContent = `${firstTok === null ? "—" : (firstTok / 1000).toFixed(1) + "s"} first token • ${totalSec.toFixed(1)}s total • ~${tokPerSec} tok/s`;
+    }
+
+    if (!opts.silent && $("ttsauto").checked) ttsSpeak(fullText);
+    return fullText;
+
+  } catch (e) {
+    if (e.name === "AbortError") {
+      if (fullText) {
+        chatMessages.push({ role: "assistant", content: cleanAiText(fullText) });
+        renderChat();
+        saveCurrentChat();
+      }
+    } else {
+      addMsg("sys", "Error: " + e.message);
+    }
+    return null;
+  } finally {
+    $("send").disabled = false;
+    $("stop").disabled = true;
+    syncVariantNav();
+  }
+}
+
+// User composer submit
+$("send").onclick = () => {
+  const v = $("input").value.trim();
+  if (v) {
+    $("input").value = "";
+    $("input").style.height = "auto";
+    send(v);
+  }
+};
+
+$("input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    $("send").click();
+  }
+});
+
+$("input").addEventListener("input", function() {
+  this.style.height = "auto";
+  this.style.height = Math.min(this.scrollHeight, 180) + "px";
+
+  // Group chat @Name mention detection
+  const val = this.value;
+  if (activeGroupId && val.includes("@")) {
+    const room = getGroupRoom(activeGroupId);
+    if (room) {
+      let matchedKey = null;
+      room.characters.forEach(ck => {
+        const c = PRESETS[ck];
+        if (c && (val.toLowerCase().includes("@" + ck) || val.toLowerCase().includes("@" + c.name.toLowerCase().split(" ")[0]))) {
+          matchedKey = ck;
+        }
+      });
+      document.querySelectorAll("#speakerPills .speaker-pill").forEach(pill => {
+        if (matchedKey && pill.dataset.charKey === matchedKey) {
+          pill.classList.add("mention-active");
+        } else {
+          pill.classList.remove("mention-active");
+        }
+      });
+    }
+  } else {
+    document.querySelectorAll("#speakerPills .speaker-pill").forEach(pill => pill.classList.remove("mention-active"));
+  }
+});
+
+$("stop").onclick = () => {
+  ttsStop();
+  if (aborter) aborter.abort();
+};
+
+// Say Hello trigger
+$("caiHello").onclick = () => {
+  if (!chatMessages.some(m => m.role === "user")) {
+    send("Hello!");
+  } else {
+    $("input").focus();
+  }
+};
+
+// New scene reset
+$("newscene").onclick = () => {
+  if (activeGroupId) {
+    const room = getGroupRoom(activeGroupId);
+    if (!room) return;
+    if (window.confirm(`Start a fresh scene in "${room.title}"?`)) {
+      chatMessages = [];
+      const firstCharKey = room.characters[0];
+      const firstChar = PRESETS[firstCharKey];
+      if (firstChar) {
+        const openingText = `*${room.scenario}*\n\n*${firstChar.name} looks around at everyone assembled and breaks the silence.* "Alright, everyone is here. Let's get straight down to business."`;
+        chatMessages.push({
+          role: "assistant",
+          speaker: firstCharKey,
+          speakerName: firstChar.name,
+          content: openingText,
+          variants: [openingText],
+          vIdx: 0
+        });
+      }
+      room.messages = chatMessages;
+      saveGroupRooms();
+      renderChat();
+      addMsg("sys", `✨ New scene started in "${room.title}".`);
+    }
+    return;
+  }
+  if (window.confirm("Start a new scene? Conversation history for this character will be refreshed.")) {
+    const char = PRESETS[currentCharKey] || PRESETS.killua;
+    chatMessages = [];
+    if (char.greeting) {
+      chatMessages.push({ role: "assistant", content: char.greeting, variants: [char.greeting], vIdx: 0 });
+    }
+    memory = "";
+    renderChat();
+    saveCurrentChat();
+    addMsg("sys", "✨ New scene started with " + char.name + ".");
+    requestImage(imagePrompt(""), "Opening scene — " + char.name);
+  }
+};
+
+$("btnNewChat").onclick = () => $("newscene").click();
+
+// One-click repair nudges
+const FIX = {
+  speak: (c, u) => "Continue as " + c + " only. Rewrite your last reply without writing any words, thoughts, or actions for " + u + ".",
+  long:  (c, u) => "Your last reply was too long. Rewrite it in half the words with 1 spoken line, ending on a hook for " + u + ".",
+  ooc:   (c, u) => "Stay as " + c + " now. Do not repeat your greeting. Continue only from " + u + "'s last message with 1 new action."
+};
+
+document.querySelectorAll("[data-fix]").forEach((b) => {
+  b.onclick = () => {
+    if (chatMessages.length && chatMessages[chatMessages.length - 1].role === "assistant") {
+      chatMessages.pop();
+      renderChat();
+    }
+    const char = readPersona();
+    send(FIX[b.dataset.fix](char.name, char.user || "Traveler"));
+  };
+});
+
+// Transcript Save
+$("save").onclick = () => {
+  if (activeGroupId) {
+    const room = getGroupRoom(activeGroupId);
+    const title = room ? room.title : "Group Chat";
+    let md = "# " + title + "\n\n";
+    chatMessages.forEach((m) => {
+      const sender = m.role === "system" ? "System" : m.role === "user" ? (readPersona().user || "You") : (m.speakerName || "Character");
+      md += `**${sender}:**\n${m.content}\n\n`;
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
+    a.download = "roleplay-" + title.toLowerCase().replace(/[^a-z0-9_-]/g, "_") + ".md";
+    a.click();
+    return;
+  }
+  const char = readPersona();
+  let md = "# Roleplay with " + char.name + "\n\n";
+  chatMessages.forEach((m) => {
+    md += (m.role === "system" ? "## System\n" : m.role === "user" ? "**" + (char.user || "You") + ":**\n" : "**" + char.name + ":**\n") + m.content + "\n\n";
+  });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
+  a.download = "roleplay-" + char.name.toLowerCase().replace(/\s+/g, "_") + ".md";
+  a.click();
+};
+
+// ---------- Persistence (localStorage + SQLite /api/db) ----------
+function saveCurrentChat() {
+  if (activeGroupId) {
+    const room = getGroupRoom(activeGroupId);
+    if (room) {
+      room.messages = chatMessages;
+      saveGroupRooms();
+    }
+    return;
+  }
+  store.save("chat_" + currentCharKey, chatMessages);
+  // Persist to server SQLite asynchronously if available
+  try {
+    fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "chat.save",
+        payload: {
+          id: "chat_" + currentCharKey,
+          character_id: currentCharKey,
+          title: (readPersona().name || "Character") + " Chat",
+          messages: chatMessages
+        }
+      })
+    }).catch(() => {});
+  } catch (e) {}
+}
+
+function loadChatForCharacter(key) {
+  const saved = store.load("chat_" + key, null);
+  if (saved && Array.isArray(saved) && saved.length) {
+    chatMessages = saved;
+  } else {
+    chatMessages = [];
+    const p = PRESETS[key];
+    if (p && p.greeting) {
+      chatMessages.push({ role: "assistant", content: p.greeting, variants: [p.greeting], vIdx: 0 });
+    }
+  }
+  renderChat();
+  syncVariantNav();
+}
+
+function persistSettings() {
+  store.save("persona_" + currentCharKey, readPersona());
+  store.save("direct", {
+    len: $("d_len").value, bal: $("d_bal").value, pace: $("d_pace").value,
+    hook: $("d_hook").value, temp: $("d_temp").value, think: $("d_think").checked,
+    mode: $("d_mode").value, custom: $("d_custom").value, model: $("model").value,
+    style: $("imgstyle").value, preset: currentCharKey,
+    imgsize: $("imgsize").value, rstyle: $("d_style").value, ctx: $("d_ctx").value,
+    turns: $("d_turns").value, ttsvoice: $("ttsvoice").value, ttsauto: $("ttsauto").checked,
+    ttsrate: $("ttsrate").value, ttspitch: $("ttspitch").value
+  });
+}
+
+function restoreSettings() {
+  const d = store.load("direct", null);
+  if (d) {
+    if (d.len) $("d_len").value = d.len;
+    if (d.bal) $("d_bal").value = d.bal;
+    if (d.pace) $("d_pace").value = d.pace;
+    if (d.hook) $("d_hook").value = d.hook;
+    if (d.temp) { $("d_temp").value = d.temp; $("tempval").textContent = d.temp; }
+    $("d_think").checked = !!d.think;
+    if (d.mode) $("d_mode").value = d.mode;
+    if (d.custom) $("d_custom").value = d.custom;
+    if (d.model) $("model").value = d.model;
+    if (d.style) $("imgstyle").value = d.style;
+    if (d.rstyle) $("d_style").value = d.rstyle;
+    if (d.ctx) $("d_ctx").value = d.ctx;
+    if (d.turns) $("d_turns").value = d.turns;
+    if (d.imgsize) $("imgsize").value = d.imgsize;
+    $("ttsauto").checked = !!d.ttsauto;
+    if (d.ttsrate) { $("ttsrate").value = d.ttsrate; $("ttsrateval").textContent = d.ttsrate; }
+    if (d.ttspitch) { $("ttspitch").value = d.ttspitch; $("ttspitchval").textContent = d.ttspitch; }
+  }
+
+  const savedChar = (d && d.preset && PRESETS[d.preset]) ? d.preset : "killua";
+  currentCharKey = savedChar;
+  $("preset").value = savedChar;
+
+  const savedPersona = store.load("persona_" + savedChar, null);
+  writePersona(savedPersona || PRESETS[savedChar]);
+  loadChatForCharacter(savedChar);
+
+  galStore = store.load("gallery", []);
+  renderGallery();
+  facts = store.load("facts", []);
+  renderFacts();
+}
+
+// ---------- Drawer Navigation ----------
+function openDrawer(tabName) {
+  $("drawerTitle").textContent = tabName.charAt(0).toUpperCase() + tabName.slice(1);
+  document.querySelectorAll(".tabpage").forEach((x) => x.classList.remove("active"));
+  const target = $("tab-" + tabName);
+  if (target) target.classList.add("active");
+
+  document.querySelectorAll("nav.tabs button").forEach((b) => {
+    b.classList.toggle("active", b.dataset.tab === tabName);
+  });
+
+  $("sheetBackdrop").hidden = false;
+  $("drawerPanel").classList.add("active");
+}
+
+function closeDrawer() {
+  $("sheetBackdrop").hidden = true;
+  $("drawerPanel").classList.remove("active");
+  document.querySelectorAll("nav.tabs button").forEach((b) => {
+    b.classList.toggle("active", b.dataset.tab === "chat");
+  });
+}
+
+document.querySelectorAll("nav.tabs button").forEach((b) => {
+  b.onclick = () => {
+    const tab = b.dataset.tab;
+    if (tab === "chat") {
+      closeDrawer();
+    } else {
+      openDrawer(tab);
+    }
+  };
+});
+
+$("btnOpenPersona").onclick = () => openDrawer("persona");
+$("drawerClose").onclick = closeDrawer;
+$("sheetBackdrop").onclick = closeDrawer;
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeDrawer();
+});
+
+// Mobile menu toggle
+$("menuToggle").onclick = () => {
+  $("sidebar").classList.toggle("open");
+};
+$("sidebarClose").onclick = () => {
+  $("sidebar").classList.remove("open");
+};
+
+// Form event hooks
+FIELDS.forEach((f) => {
+  const el = $("p_" + f);
+  if (el) el.oninput = () => { updatePreview(); persistSettings(); syncHero(); };
+});
+
+$("preset").onchange = () => {
+  switchCharacter($("preset").value);
+};
+
+$("d_temp").oninput = () => {
+  tempTouched = true;
+  $("tempval").textContent = $("d_temp").value;
+  persistSettings();
+};
+$("d_len").onchange = () => {
+  if (!tempTouched && LEN[$("d_len").value]) {
+    $("d_temp").value = LEN[$("d_len").value].temp;
+    $("tempval").textContent = $("d_temp").value;
+  }
+  updatePreview();
+  persistSettings();
+};
+["d_bal", "d_pace", "d_hook", "d_mode", "d_style", "d_ctx", "d_turns"].forEach((id) => {
+  const el = $(id);
+  if (el) el.onchange = () => {
+    if (id === "d_mode") {
+      $("customPromptBox").classList.toggle("hidden", el.value !== "custom");
+    }
+    updatePreview();
+    persistSettings();
+  };
+});
+$("d_custom").oninput = () => { updatePreview(); persistSettings(); };
+$("d_think").onchange = persistSettings;
+
+// ---------- Models list ----------
+async function loadModels() {
+  const st = $("status");
+  try {
+    const r = await fetch("/api/models");
+    const j = await r.json();
+    if (j.error) throw new Error(j.error);
+    const dl = $("models");
+    dl.innerHTML = "";
+    (j.models || []).forEach((m) => {
+      const o = document.createElement("option");
+      o.value = m;
+      dl.appendChild(o);
+    });
+    if (j.models && j.models.length && !$("model").value) {
+      $("model").value = j.models[0];
+    }
+    st.textContent = "Ollama Connected (" + (j.models ? j.models.length : 0) + " models)";
+    st.className = "ok";
+  } catch (e) {
+    st.textContent = "Ollama offline — check `ollama serve`";
+    st.className = "bad";
+  }
+}
+$("refresh").onclick = loadModels;
+
+// ---------- AI Character Generator ----------
+const AP_INSTRUCTION = 'You are a character-creation assistant. The user will describe a roleplay character in one free-text prompt. Return ONLY a single JSON object, no other text, no markdown, no code fences, with EXACTLY these keys: {"name": string, "age": string, "persona": string (2-3 sentences: voice, values, flaw), "hair": string, "eyes": string, "build": string, "outfit": string, "extra": string, "vibe": string (1-2 sentences of plain prose describing the emotional dynamic), "scene": string (2-3 sentences: where, when, who is present, the spark), "user": string (the user\'s name, default "Traveler"), "userpersona": string (1-2 sentences)}. Rules: never leave a key empty; vibe must be prose; scene must work as-is as an opening scene. User prompt:';
+
+$("ap_btn").onclick = async () => {
+  const msg = $("ap_msg"), prompt = $("ap_prompt").value.trim();
+  const model = $("model").value.trim();
+  if (!prompt) { msg.textContent = "Describe your character first."; return; }
+  if (!model) { msg.textContent = "Pick a model in the sidebar first."; return; }
+  msg.textContent = "✨ Crafting character persona…";
+  $("ap_btn").disabled = true;
+  try {
+    const r = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model, stream: false, think: false, temperature: 0.4, num_predict: 800,
+        messages: [{ role: "system", content: AP_INSTRUCTION }, { role: "user", content: prompt }]
+      })
+    });
+    if (!r.ok) throw new Error("Server HTTP " + r.status);
+    const j = await r.json();
+    const raw = (((j.message || {}).content) || "").trim();
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error("Model returned prose instead of JSON");
+    const d = JSON.parse(m[0]);
+    const map = { name: "p_name", age: "p_age", persona: "p_persona", hair: "p_hair", eyes: "p_eyes", build: "p_build", outfit: "p_outfit", extra: "p_extra", vibe: "p_vibe", scene: "p_scene", user: "p_user", userpersona: "p_userpersona" };
+    Object.keys(map).forEach((k) => { if (d[k]) $(map[k]).value = d[k]; });
+    updatePreview();
+    persistSettings();
+    syncHero();
+    msg.textContent = "✨ " + ($("p_name").value || "Character") + " created successfully!";
+  } catch (e) {
+    msg.textContent = "Generation failed: " + e.message;
+  } finally {
+    $("ap_btn").disabled = false;
+  }
+};
+
+// ---------- Scene Images (Hapuppy Model) ----------
+const IMGSIZES = { portrait: [512, 768], square: [768, 768], landscape: [768, 512] };
+function selectedImgSize() {
+  const v = ($("imgsize") && $("imgsize").value) || "portrait";
+  return IMGSIZES[v] || IMGSIZES.portrait;
+}
+
+function imagePrompt(extra) {
+  const p = readPersona();
+  return "soft anime illustration of " + p.name + ", " + appearanceLine(p) + " " + (extra || p.scene) +
+    ", " + $("imgstyle").value + ", detailed, warm cinematic lighting";
+}
+
+async function requestImage(prompt, caption, targetMsgIdx) {
+  addMsg("sys", "🎨 Illustrating scene… (chat remains usable)");
+  try {
+    const [w, h] = selectedImgSize();
+    const apiKey = ($("hapuppy_key") && $("hapuppy_key").value.trim()) || store.load("hapuppy_key", "");
+    const r = await fetch("/api/image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, width: w, height: h, api_key: apiKey })
+    });
+    const j = await r.json();
+    if (j.error) throw new Error(j.error);
+    pollImage(j.job, caption, targetMsgIdx);
+  } catch (e) {
+    addMsg("sys", "Image illustration failed: " + e.message);
+  }
+}
+
+async function pollImage(job, caption, targetMsgIdx) {
+  for (let i = 0; i < 35; i++) {
+    await new Promise((r) => setTimeout(r, 3500));
+    try {
+      const r = await fetch("/api/image/" + job);
+      const j = await r.json();
+      if (j.error) { addMsg("sys", "Image error: " + j.error); return; }
+      if (j.done && j.img) {
+        if ($("sceneimg")) $("sceneimg").src = j.img;
+        if ($("scenecap")) $("scenecap").textContent = caption;
+        addGalImg(j.img, caption);
+
+        // Find message to attach scene illustration to
+        let attachIdx = (typeof targetMsgIdx === "number" && targetMsgIdx >= 0) ? targetMsgIdx : -1;
+        if (attachIdx === -1) {
+          for (let k = chatMessages.length - 1; k >= 0; k--) {
+            if (chatMessages[k].role === "assistant") {
+              attachIdx = k;
+              break;
+            }
+          }
+        }
+        if (attachIdx >= 0 && chatMessages[attachIdx]) {
+          chatMessages[attachIdx].image = j.img;
+          chatMessages[attachIdx].caption = caption;
+          if (activeGroupId) {
+            const room = getGroupRoom(activeGroupId);
+            if (room) room.messages = chatMessages;
+            saveGroupRooms();
+          } else {
+            saveCurrentChat();
+          }
+          renderChat();
+          scrollToBottom();
+        }
+        addMsg("sys", "✦ Scene illustration rendered and attached to chat.");
+        return;
+      }
+    } catch (e) {}
+  }
+  addMsg("sys", "Illustration timed out — try again later.");
+}
+
+function saveGallery() {
+  store.save("gallery", galStore.slice(0, 40));
+  $("galcount").textContent = galStore.length ? "(" + galStore.length + ")" : "";
+}
+
+function renderGallery() {
+  const g = $("gal");
+  g.innerHTML = "";
+  galStore.forEach((it) => paintGalFigure(it.img, it.cap));
+}
+
+function paintGalFigure(src, cap) {
+  const g = $("gal");
+  const f = document.createElement("figure");
+  const im = document.createElement("img");
+  im.src = src; im.loading = "lazy"; im.alt = cap || "scene illustration";
+  const c = document.createElement("figcaption");
+  c.textContent = cap || "";
+  const del = document.createElement("button");
+  del.className = "galdel";
+  del.textContent = "✕";
+  del.onclick = () => {
+    galStore = galStore.filter((it) => it.img !== src);
+    saveGallery();
+    f.remove();
+  };
+  f.appendChild(im); f.appendChild(c); f.appendChild(del);
+  g.prepend(f);
+}
+
+function addGalImg(src, cap) {
+  galStore.unshift({ img: src, cap });
+  saveGallery();
+  paintGalFigure(src, cap);
+}
+
+$("galclear").onclick = () => {
+  if (!galStore.length) return;
+  if (!window.confirm("Delete all " + galStore.length + " gallery pictures?")) return;
+  galStore = [];
+  saveGallery();
+  $("gal").innerHTML = "";
+};
+
+$("illustrate").onclick = () => {
+  let targetIdx = -1;
+  for (let i = chatMessages.length - 1; i >= 0; i--) {
+    if (chatMessages[i].role === "assistant") {
+      targetIdx = i;
+      break;
+    }
+  }
+  const last = targetIdx >= 0 ? chatMessages[targetIdx] : null;
+  const spkName = last ? (last.speakerName || (readPersona().name || "Scene")) : "Scene";
+  requestImage(imagePrompt(last ? last.content.slice(0, 220) : ""), "Scene moment — " + spkName, targetIdx);
+};
+
+// Compare Variations
+$("compare").onclick = () => {
+  const last = [...chatMessages].reverse().find(m => m.role === "assistant");
+  const base = imagePrompt(last ? last.content.slice(0, 220) : "");
+  const cmp = $("cmp");
+  cmp.innerHTML = "";
+  addMsg("sys", "🎨 Generating 3 scene variations side-by-side…");
+  [1, 2, 3].forEach((n) => {
+    const label = "Variation " + n;
+    const f = document.createElement("figure");
+    const im = document.createElement("img");
+    im.style.cssText = "width:100%;min-height:120px;background:#0f1115";
+    const c = document.createElement("figcaption");
+    c.textContent = label + " — painting…";
+    const btn = document.createElement("button");
+    btn.className = "secondary tiny";
+    btn.type = "button";
+    btn.textContent = "Set as Scene";
+    btn.disabled = true;
+    btn.onclick = () => {
+      if (!im.src) return;
+      if ($("sceneimg")) $("sceneimg").src = im.src;
+      if ($("scenecap")) $("scenecap").textContent = "Selected — " + label;
+      addGalImg(im.src, "Selected — " + label);
+      for (let k = chatMessages.length - 1; k >= 0; k--) {
+        if (chatMessages[k].role === "assistant") {
+          chatMessages[k].image = im.src;
+          chatMessages[k].caption = "Selected — " + label;
+          if (activeGroupId) {
+            const room = getGroupRoom(activeGroupId);
+            if (room) room.messages = chatMessages;
+            saveGroupRooms();
+          } else {
+            saveCurrentChat();
+          }
+          renderChat();
+          break;
+        }
+      }
+      addMsg("sys", "✦ Variation selected and attached to chat.");
+    };
+    f.appendChild(im); f.appendChild(c); f.appendChild(btn);
+    cmp.appendChild(f);
+    requestCompare(base, label, im, c, btn);
+  });
+};
+
+async function requestCompare(prompt, label, im, cap, btn) {
+  try {
+    const [w, h] = selectedImgSize();
+    const apiKey = ($("hapuppy_key") && $("hapuppy_key").value.trim()) || store.load("hapuppy_key", "");
+    const r = await fetch("/api/image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, width: w, height: h, api_key: apiKey })
+    });
+    const j = await r.json();
+    if (j.error) throw new Error(j.error);
+    for (let i = 0; i < 40; i++) {
+      await new Promise(r2 => setTimeout(r2, 3500));
+      const r3 = await fetch("/api/image/" + j.job);
+      const j3 = await r3.json();
+      if (j3.done && j3.img) {
+        im.src = j3.img;
+        cap.textContent = label + " — ready";
+        btn.disabled = false;
+        return;
+      }
+    }
+    cap.textContent = label + " — timed out";
+  } catch (e) {
+    cap.textContent = label + " — failed: " + e.message;
+  }
+}
+
+// ---------- Fact Ledger & Memory ----------
+function saveFacts() {
+  facts = facts.slice(-40);
+  store.save("facts", facts);
+  $("factcount").textContent = facts.length ? "(" + facts.length + ")" : "";
+}
+
+function mergeFacts(cands) {
+  let added = 0;
+  cands.forEach((c) => {
+    if (!c || !c.text) return;
+    let t = c.text.trim().replace(/\s+/g, " ").slice(0, 200);
+    if (!t) return;
+    const cat = ["ENTITY","PROMISE","INJURY","MILESTONE","USER","QUOTE"].includes(c.cat) ? c.cat : "ENTITY";
+    if (cat !== "QUOTE" && facts.some(f => f.text.toLowerCase() === t.toLowerCase())) return;
+    facts.push({ id: "f" + Date.now().toString(36) + Math.floor(Math.random() * 99), cat, text: t, ts: Date.now() });
+    added++;
+  });
+  saveFacts();
+  renderFacts();
+  updatePreview();
+  return added;
+}
+
+function renderFacts() {
+  const box = $("factlist");
+  box.innerHTML = "";
+  facts.forEach((f) => {
+    const d = document.createElement("div");
+    d.style.cssText = "display:flex; align-items:center; gap:8px; padding:6px 10px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:var(--radius-sm); font-size:0.8rem;";
+    const badge = document.createElement("span");
+    badge.style.cssText = "font-weight:700; color:var(--accent); font-size:0.7rem;";
+    badge.textContent = `[${f.cat}]`;
+    const txt = document.createElement("span");
+    txt.style.flex = "1";
+    txt.textContent = f.text;
+    const del = document.createElement("button");
+    del.className = "secondary tiny";
+    del.textContent = "✕";
+    del.onclick = () => {
+      facts = facts.filter(g => g.id !== f.id);
+      saveFacts();
+      renderFacts();
+      updatePreview();
+    };
+    d.appendChild(badge); d.appendChild(txt); d.appendChild(del);
+    box.appendChild(d);
+  });
+  saveFacts();
+}
+
+function pinQuote(text) {
+  const q = text.length > 220 ? text.slice(0, 220) + "…" : text;
+  mergeFacts([{ cat: "QUOTE", text: '"' + q + '"', ts: Date.now() }]);
+  addMsg("sys", "📌 Pinned quote to Memory Ledger.");
+}
+
+$("factadd_btn").onclick = () => {
+  const t = $("factadd_text").value.trim();
+  if (!t) return;
+  mergeFacts([{ cat: $("factadd_cat").value, text: t, ts: Date.now() }]);
+  $("factadd_text").value = "";
+};
+
+$("factextract").onclick = async () => {
+  const model = $("model").value.trim();
+  if (!model) return;
+  const mid = chatMessages.slice(-8);
+  if (mid.length < 2) {
+    addMsg("sys", "Need more conversation history to extract facts.");
+    return;
+  }
+  const existing = facts.map(f => "- [" + f.cat + "] " + f.text).join("\n");
+  const char = readPersona();
+  const slice = mid.map(m => (m.role === "user" ? (char.user || "You") : char.name) + ": " + m.content).join("\n");
+  addMsg("sys", "⛏ Extracting lasting memories and facts…");
+  try {
+    const r = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model, stream: false, think: false, temperature: 0.1, num_predict: 300,
+        messages: [
+          { role: "system", content: 'You extract lasting facts from a roleplay transcript for a MEMORY ledger. Return ONLY a JSON array, no other text. Each item: {"cat": one of ENTITY|PROMISE|INJURY|MILESTONE|USER, "text": "<=25 words, concrete, self-contained with names"}. At most 6 items. If none, return [].' },
+          { role: "user", content: "Existing facts:\n" + existing + "\n\nTranscript:\n" + slice }
+        ]
+      })
+    });
+    const j = await r.json();
+    const raw = (((j.message || {}).content) || "").trim();
+    const m = raw.match(/\[[\s\S]*\]/);
+    if (m) {
+      const arr = JSON.parse(m[0]);
+      if (Array.isArray(arr) && arr.length) {
+        const n = mergeFacts(arr);
+        addMsg("sys", `🧠 +${n} lasting facts filed to Memory.`);
+      }
+    }
+  } catch (e) {
+    addMsg("sys", "Fact extraction failed: " + e.message);
+  }
+};
+
+$("factexport").onclick = () => {
+  const char = readPersona();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(facts, null, 2)], { type: "application/json" }));
+  a.download = "roleplay-facts-" + char.name.toLowerCase().replace(/\s+/g, "_") + ".json";
+  a.click();
+};
+
+$("factimport").onclick = () => $("factfile").click();
+$("factfile").onchange = (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const a = JSON.parse(rd.result);
+      if (Array.isArray(a)) {
+        mergeFacts(a);
+        addMsg("sys", "Facts successfully imported.");
+      }
+    } catch (err) {}
+  };
+  rd.readAsText(f);
+  e.target.value = "";
+};
+
+$("factclear").onclick = () => {
+  if (!facts.length) return;
+  if (!window.confirm("Clear all " + facts.length + " memory facts?")) return;
+  facts = [];
+  saveFacts();
+  renderFacts();
+  updatePreview();
+};
+
+// Recall Search
+function recallAll(q) {
+  const out = [];
+  chatMessages.forEach((m, i) => {
+    if (m.role !== "system" && m.content.toLowerCase().includes(q)) {
+      out.push({ src: "chat", i, text: m.content });
+    }
+  });
+  facts.forEach((f) => {
+    if (f.text.toLowerCase().includes(q)) {
+      out.push({ src: "fact", text: "[" + f.cat + "] " + f.text });
+    }
+  });
+  galStore.forEach((g) => {
+    if ((g.cap || "").toLowerCase().includes(q)) {
+      out.push({ src: "image", text: g.cap, img: g.img });
+    }
+  });
+  return out.slice(-20);
+}
+
+$("recallq").oninput = (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  const box = $("recallres");
+  box.innerHTML = "";
+  if (!q) return;
+  const hits = recallAll(q);
+  if (!hits.length) { box.textContent = "No matches found."; return; }
+  hits.forEach((h) => {
+    const d = document.createElement("div");
+    d.style.cssText = "padding:6px 8px; border-bottom:1px solid var(--border); font-size:0.8rem;";
+    d.textContent = h.text;
+    box.appendChild(d);
+  });
+};
+
+// ---------- On-Device TTS ----------
+function ttsStop() {
+  try { speechSynthesis.cancel(); } catch (e) {}
+  utterQueue = [];
+}
+
+function ttsSpeak(text) {
+  if (!("speechSynthesis" in window)) return;
+  ttsStop();
+  try { speechSynthesis.resume(); } catch (e) {}
+  const vs = speechSynthesis.getVoices();
+  const want = $("ttsvoice").value;
+  const v = vs.find(x => x.name === want) || vs.find(x => x.lang && x.lang.indexOf("en") === 0) || vs[0];
+  const clean = cleanAiText(text).slice(0, 1000);
+  const u = new SpeechSynthesisUtterance(clean);
+  if (v) u.voice = v;
+  u.rate = parseFloat($("ttsrate").value);
+  u.pitch = parseFloat($("ttspitch").value);
+  speechSynthesis.speak(u);
+}
+
+function populateVoices() {
+  const sel = $("ttsvoice");
+  if (!("speechSynthesis" in window)) {
+    sel.innerHTML = "<option>TTS not supported in this browser</option>";
+    return;
+  }
+  const fill = () => {
+    const vs = speechSynthesis.getVoices();
+    if (!vs.length) return;
+    sel.innerHTML = "";
+    vs.forEach((v) => {
+      const o = document.createElement("option");
+      o.value = v.name;
+      o.textContent = v.name + " (" + v.lang + ")";
+      sel.appendChild(o);
+    });
+    const d = store.load("direct", {});
+    if (d.ttsvoice) sel.value = d.ttsvoice;
+  };
+  fill();
+  speechSynthesis.onvoiceschanged = fill;
+}
+
+$("ttsrate").oninput = () => { $("ttsrateval").textContent = $("ttsrate").value; persistSettings(); };
+$("ttspitch").oninput = () => { $("ttspitchval").textContent = $("ttspitch").value; persistSettings(); };
+$("ttsauto").onchange = persistSettings;
+
+// Dictation Speech Recognition
+(function() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { $("dictate").style.display = "none"; return; }
+  const rec = new SR();
+  rec.interimResults = true;
+  let base = "";
+  rec.onresult = (e) => {
+    let interim = "";
+    for (const r of e.results) {
+      if (r.isFinal) base += r[0].transcript + " ";
+      else interim += r[0].transcript;
+    }
+    $("input").value = base + interim;
+  };
+  rec.onend = () => {
+    $("dictate").disabled = false;
+  };
+  $("dictate").onclick = () => {
+    base = $("input").value ? $("input").value + " " : "";
+    $("dictate").disabled = true;
+    try { rec.start(); } catch (e) { $("dictate").disabled = false; }
+  };
+})();
+
+// ---------- Character Card V2 Import / Export ----------
+function exportCharacterCardV2() {
+  const p = readPersona();
+  const cardData = {
+    spec: "chara_card_v2",
+    spec_version: "2.0",
+    data: {
+      name: p.name || "Character",
+      description: p.persona || "",
+      personality: p.persona || "",
+      scenario: p.scene || "",
+      first_mes: p.greeting || "",
+      mes_example: p.mes_example || "",
+      creator_notes: "Exported from InfinityRoleplay Studio",
+      system_prompt: "",
+      post_history_instructions: "",
+      alternate_greetings: [],
+      character_book: null,
+      tags: (PRESETS[currentCharKey] && PRESETS[currentCharKey].tags) || ["Roleplay", "InfinityRoleplay"],
+      creator: "InfinityRoleplay",
+      character_version: "2.0",
+      extensions: {
+        age: p.age || "",
+        hair: p.hair || "",
+        eyes: p.eyes || "",
+        build: p.build || "",
+        outfit: p.outfit || "",
+        extra: p.extra || "",
+        vibe: p.vibe || "",
+        user: p.user || "Hunter",
+        userpersona: p.userpersona || ""
+      }
+    }
+  };
+  const jsonStr = JSON.stringify(cardData, null, 2);
+  const blob = new Blob([jsonStr], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  const safeName = (p.name || "character").toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+  a.download = `card_${safeName}_v2.json`;
+  a.click();
+  addMsg("sys", `📤 Exported Character Card V2 for ${p.name || "Character"}`);
+}
+
+function importCharacterCardV2(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const json = JSON.parse(reader.result);
+      const d = (json.spec === "chara_card_v2" && json.data) ? json.data : (json.data || json);
+      const ext = d.extensions || {};
+
+      const importedId = "custom_" + Date.now().toString(36);
+      const importedName = d.name || "Imported Character";
+
+      const newCard = {
+        id: importedId,
+        name: importedName,
+        age: ext.age || d.age || "",
+        persona: d.personality || d.description || "",
+        hair: ext.hair || d.hair || "",
+        eyes: ext.eyes || d.eyes || "",
+        build: ext.build || d.build || "",
+        outfit: ext.outfit || d.outfit || "",
+        extra: ext.extra || d.extra || "",
+        vibe: ext.vibe || d.vibe || "",
+        scene: d.scenario || ext.scene || d.scene || "",
+        greeting: d.first_mes || ext.greeting || d.greeting || "",
+        mes_example: d.mes_example || ext.mes_example || "",
+        user: ext.user || d.user || "Hunter",
+        userpersona: ext.userpersona || d.userpersona || "A trusted companion.",
+        tags: d.tags || ["Custom"]
+      };
+
+      PRESETS[importedId] = newCard;
+
+      const customPresets = store.load("custom_presets", {});
+      customPresets[importedId] = newCard;
+      store.save("custom_presets", customPresets);
+
+      renderSidebarChars();
+      syncPresetDropdown();
+      populateGroupCharCheckboxes();
+      switchCharacter(importedId);
+      addMsg("sys", `📥 Successfully imported Character Card V2: ${importedName}`);
+    } catch (err) {
+      addMsg("sys", "Failed to import Character Card: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function syncPresetDropdown() {
+  const sel = $("preset");
+  if (!sel) return;
+  sel.innerHTML = "";
+  Object.keys(PRESETS).forEach(k => {
+    const c = PRESETS[k];
+    const opt = document.createElement("option");
+    opt.value = k;
+    opt.textContent = `${c.name} — ${c.persona ? c.persona.slice(0, 35) + "…" : "Character"}`;
+    sel.appendChild(opt);
+  });
+  sel.value = currentCharKey;
+}
+
+// ---------- Group Chat Banter & UI Initialization ----------
+async function continueGroupBanter() {
+  if (!activeGroupId || $("send").disabled) return;
+  const room = getGroupRoom(activeGroupId);
+  if (!room || !room.characters || !room.characters.length) return;
+
+  const recentAi = chatMessages.filter(m => m.role === "assistant");
+  const lastSpeaker = recentAi.length ? recentAi[recentAi.length - 1].speaker : null;
+
+  const charKeys = room.characters;
+  let nextIdx = 0;
+  if (lastSpeaker) {
+    const curIdx = charKeys.indexOf(lastSpeaker);
+    if (curIdx !== -1) {
+      nextIdx = (curIdx + 1) % charKeys.length;
+    }
+  }
+  const nextSpeakerKey = charKeys[nextIdx];
+  const nextChar = PRESETS[nextSpeakerKey];
+  if (!nextChar) return;
+
+  const btnBanter = $("btnBanter");
+  const origHtml = btnBanter ? btnBanter.innerHTML : "";
+  const targetPill = document.querySelector(`#speakerPills .speaker-pill[data-char-key="${nextSpeakerKey}"]`);
+
+  if (btnBanter) {
+    btnBanter.innerHTML = `<i class="material-icons" style="font-size:0.95rem;">more_horiz</i><span>${escHtml(nextChar.name)} typing…</span>`;
+    btnBanter.disabled = true;
+  }
+  if (targetPill) targetPill.classList.add("banter-pulsing");
+
+  // Realistic human/AI typing cadence pause (1.2s - 2.0s)
+  await new Promise(r => setTimeout(r, 1200 + Math.random() * 800));
+
+  if (targetPill) targetPill.classList.remove("banter-pulsing");
+  if (btnBanter) {
+    btnBanter.innerHTML = origHtml;
+    btnBanter.disabled = false;
+  }
+
+  const promptText = `*React naturally to what the others just said and move the group conversation forward.*`;
+  await send(promptText, { groupSpeaker: nextSpeakerKey, nouser: true });
+}
+
+function populateGroupCharCheckboxes() {
+  const container = $("group_char_checkboxes");
+  if (!container) return;
+  container.innerHTML = "";
+  Object.keys(PRESETS).forEach(k => {
+    const c = PRESETS[k];
+    const lbl = document.createElement("label");
+    lbl.style.cssText = "display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;";
+    const isDefaultChecked = (k === "killua" || k === "gon" || k === "kurapika");
+    lbl.innerHTML = `
+      <input type="checkbox" value="${k}" ${isDefaultChecked ? "checked" : ""} />
+      <span><b>${escHtml(c.name)}</b> (${escHtml(c.age || "Character")})</span>
+    `;
+    container.appendChild(lbl);
+  });
+}
+
+function initGroupChatUI() {
+  const btnNewGroup = $("btnNewGroup");
+  if (btnNewGroup) {
+    btnNewGroup.onclick = () => {
+      populateGroupCharCheckboxes();
+      openDrawer("group");
+    };
+  }
+
+  const btnCreateGroup = $("btnCreateGroup");
+  if (btnCreateGroup) {
+    btnCreateGroup.onclick = () => {
+      const title = ($("group_title") && $("group_title").value.trim()) || "Hunter Strategy Room";
+      const scenario = ($("group_scenario") && $("group_scenario").value.trim()) || "A secluded location where everyone gathers to discuss strategy.";
+      const checkedBoxes = document.querySelectorAll("#group_char_checkboxes input[type='checkbox']:checked");
+      const selectedChars = Array.from(checkedBoxes).map(cb => cb.value);
+
+      if (selectedChars.length < 2) {
+        alert("Please select at least 2 characters for the group chat.");
+        return;
+      }
+
+      const roomId = "grp_" + Date.now().toString(36);
+      const newRoom = {
+        id: roomId,
+        title: title,
+        scenario: scenario,
+        characters: selectedChars,
+        activeSpeaker: "auto",
+        messages: []
+      };
+
+      const firstCharKey = selectedChars[0];
+      const firstChar = PRESETS[firstCharKey];
+      if (firstChar) {
+        const openingText = `*${scenario}*\n\n*${firstChar.name} looks around at everyone assembled and breaks the silence.* "Alright, everyone is here. Let's get straight down to business."`;
+        newRoom.messages.push({
+          role: "assistant",
+          speaker: firstCharKey,
+          speakerName: firstChar.name,
+          content: openingText,
+          variants: [openingText],
+          vIdx: 0
+        });
+      }
+
+      groupRooms.push(newRoom);
+      saveGroupRooms();
+      renderGroupRooms();
+      switchGroupRoom(roomId);
+      closeDrawer();
+      addMsg("sys", `👥 Created and entered group chat: "${title}"`);
+    };
+  }
+
+  const btnBanter = $("btnBanter");
+  if (btnBanter) {
+    btnBanter.onclick = continueGroupBanter;
+  }
+}
+
+// ---------- Hapuppy API Key Initialization & Persistence ----------
+function initHapuppyKeyUI() {
+  const input = $("hapuppy_key");
+  const saveBtn = $("hapuppy_save_btn");
+  const statusEl = $("hapuppy_status");
+  if (!input || !saveBtn) return;
+
+  const localKey = store.load("hapuppy_key", "");
+  if (localKey) {
+    input.value = localKey;
+    if (statusEl) statusEl.textContent = "Configured ✓";
+  } else {
+    fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "kv.get", payload: { key: "hapuppy_key" } })
+    }).then(r => r.json()).then(j => {
+      if (j && j.ok && j.result) {
+        input.value = j.result;
+        store.save("hapuppy_key", j.result);
+        if (statusEl) statusEl.textContent = "Configured ✓";
+      }
+    }).catch(() => {});
+  }
+
+  saveBtn.onclick = () => {
+    const val = input.value.trim();
+    store.save("hapuppy_key", val);
+    fetch("/api/db", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "kv.set", payload: { key: "hapuppy_key", value: val } })
+    }).catch(() => {});
+    if (statusEl) {
+      statusEl.textContent = val ? "Saved ✓" : "Cleared";
+      statusEl.style.color = val ? "var(--status-ok)" : "var(--text-muted)";
+    }
+    addMsg("sys", val ? "🔑 Hapuppy API key saved." : "🔑 Hapuppy API key cleared.");
+  };
+}
+
+// Character Card Button Bindings
+if ($("card_export_btn")) $("card_export_btn").onclick = exportCharacterCardV2;
+if ($("card_import_btn")) $("card_import_btn").onclick = () => $("card_file_input") && $("card_file_input").click();
+if ($("card_file_input")) {
+  $("card_file_input").onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      importCharacterCardV2(file);
+      e.target.value = "";
+    }
+  };
+}
+
+// ---------- Boot ----------
+const savedCustomPresets = store.load("custom_presets", {});
+Object.keys(savedCustomPresets).forEach(k => {
+  PRESETS[k] = savedCustomPresets[k];
+});
+
+renderSidebarChars();
+syncPresetDropdown();
+renderGroupRooms();
+populateGroupCharCheckboxes();
+initGroupChatUI();
+initHapuppyKeyUI();
+restoreSettings();
+updatePreview();
+loadModels();
+
+// ---------- Character Search & Filter ----------
+function filterSidebarChars(query) {
+  const q = (query || "").toLowerCase().trim();
+  const items = document.querySelectorAll("#charList .char-item");
+  items.forEach(item => {
+    const k = item.dataset.id;
+    const c = PRESETS[k];
+    if (!c) return;
+    const matches = !q || c.name.toLowerCase().includes(q) || (c.age && c.age.toLowerCase().includes(q)) || (c.persona && c.persona.toLowerCase().includes(q));
+    item.style.display = matches ? "flex" : "none";
+  });
+}
+const charSearchInput = $("charSearch");
+if (charSearchInput) {
+  charSearchInput.addEventListener("input", (e) => filterSidebarChars(e.target.value));
+}
+
+// ---------- Per-Character Voice Preference ----------
+function syncCharacterVoice(key) {
+  const vSelect = $("ttsvoice");
+  if (!vSelect) return;
+  const saved = store.load("ttsvoice_" + key, "");
+  if (saved) {
+    vSelect.value = saved;
+  }
+}
+if ($("ttsvoice")) {
+  $("ttsvoice").addEventListener("change", () => {
+    store.save("ttsvoice_" + currentCharKey, $("ttsvoice").value);
+  });
+}
+
+// ---------- Full Studio Backup & Restore ----------
+function exportStudioBackup() {
+  const backup = {
+    version: 3,
+    exported_at: new Date().toISOString(),
+    custom_presets: store.load("custom_presets", {}),
+    group_rooms: store.load("group_rooms", []),
+    facts: store.load("facts", []),
+    gallery: store.load("gallery", []),
+    chats: {},
+    personas: {},
+    direct: store.load("direct", {})
+  };
+  Object.keys(PRESETS).forEach(k => {
+    backup.chats[k] = store.load("chat_" + k, []);
+    backup.personas[k] = store.load("persona_" + k, null);
+  });
+
+  fetch("/api/db", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "backup.export" })
+  }).then(r => r.json()).then(j => {
+    if (j && j.ok && j.result) backup.server_db = j.result;
+  }).catch(() => {}).finally(() => {
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `infinityroleplay_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    const statusEl = $("backup_status");
+    if (statusEl) {
+      statusEl.textContent = "Backup exported ✓";
+      statusEl.style.color = "var(--status-ok)";
+    }
+    addMsg("sys", "📦 Full studio backup exported.");
+  });
+}
+
+function importStudioBackup(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data || typeof data !== "object") throw new Error("Invalid backup JSON");
+      if (data.custom_presets) store.save("custom_presets", data.custom_presets);
+      if (data.group_rooms) store.save("group_rooms", data.group_rooms);
+      if (data.facts) store.save("facts", data.facts);
+      if (data.gallery) store.save("gallery", data.gallery);
+      if (data.direct) store.save("direct", data.direct);
+      if (data.chats) {
+        Object.keys(data.chats).forEach(k => store.save("chat_" + k, data.chats[k]));
+      }
+      if (data.personas) {
+        Object.keys(data.personas).forEach(k => {
+          if (data.personas[k]) store.save("persona_" + k, data.personas[k]);
+        });
+      }
+      if (data.server_db) {
+        fetch("/api/db", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "backup.import", payload: { backup: data.server_db } })
+        }).catch(() => {});
+      }
+      const statusEl = $("backup_status");
+      if (statusEl) {
+        statusEl.textContent = "Restored ✓";
+        statusEl.style.color = "var(--status-ok)";
+      }
+      addMsg("sys", "📥 Studio state restored from backup. Refreshing…");
+      setTimeout(() => location.reload(), 1000);
+    } catch (err) {
+      alert("Failed to restore backup: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+if ($("btnBackup")) $("btnBackup").onclick = exportStudioBackup;
+if ($("btnRestore")) $("btnRestore").onclick = () => $("fileRestore") && $("fileRestore").click();
+if ($("fileRestore")) {
+  $("fileRestore").onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      importStudioBackup(file);
+      e.target.value = "";
+    }
+  };
+}
+
+// ---------- Character Card Studio, Online Search & AI Generator ----------
+function openModal(id) {
+  const el = $(id);
+  if (!el) return;
+  if (typeof M !== "undefined" && M.Modal) {
+    const inst = M.Modal.getInstance(el) || M.Modal.init(el);
+    inst.open();
+  } else {
+    el.classList.add("open");
+    el.style.display = "block";
+  }
+}
+
+function closeModal(id) {
+  const el = $(id);
+  if (!el) return;
+  if (typeof M !== "undefined" && M.Modal) {
+    const inst = M.Modal.getInstance(el);
+    if (inst) inst.close();
+  } else {
+    el.classList.remove("open");
+    el.style.display = "none";
+  }
+}
+
+function registerAndActivateCharacterCard(d, opts) {
+  opts = opts || {};
+  const raw = (d && d.card && d.card.data) ? d.card.data : ((d && d.spec === "chara_card_v2" && d.data) ? d.data : (d && d.data ? d.data : (d || {})));
+  const ext = raw.extensions || {};
+  const name = (raw.name || opts.fallbackName || "New Character").trim();
+  const baseId = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 24) || "custom";
+  let uniqueId = baseId;
+  let counter = 1;
+  while (PRESETS[uniqueId] && (!opts.overwrite || PRESETS[uniqueId].id !== uniqueId)) {
+    uniqueId = `${baseId}_${counter++}`;
+  }
+
+  const personaDesc = [raw.description, raw.personality].filter(Boolean).join("\n\n") || raw.persona || "A compelling character.";
+  const tags = Array.isArray(raw.tags) ? raw.tags : (typeof raw.tags === "string" ? raw.tags.split(",").map(t => t.trim()).filter(Boolean) : ["Custom"]);
+  const greeting = raw.first_mes || raw.greeting || ext.greeting || `*Looking up as you approach.* "What brings you here?"`;
+  const avatarUrl = raw.avatar || ext.avatar || (d && d.avatar) || "";
+
+  const newCard = {
+    id: uniqueId,
+    name: name,
+    avatar: avatarUrl,
+    creator: raw.creator || "InfinityRoleplay Studio",
+    character_version: raw.character_version || "1.0",
+    persona: personaDesc,
+    scene: raw.scenario || raw.scene || ext.scene || "A quiet environment.",
+    greeting: greeting,
+    mes_example: raw.mes_example || ext.mes_example || "",
+    system_prompt: raw.system_prompt || "",
+    post_history_instructions: raw.post_history_instructions || "",
+    alternate_greetings: Array.isArray(raw.alternate_greetings) ? raw.alternate_greetings : [],
+    user: ext.user || raw.user || "Traveler",
+    userpersona: ext.userpersona || raw.userpersona || "A trusted companion and fellow adventurer.",
+    tags: tags
+  };
+
+  PRESETS[uniqueId] = newCard;
+  const customPresets = store.load("custom_presets", {});
+  customPresets[uniqueId] = newCard;
+  store.save("custom_presets", customPresets);
+
+  renderSidebarChars();
+  syncPresetDropdown();
+  populateGroupCharCheckboxes();
+  switchCharacter(uniqueId);
+  addMsg("sys", `✨ Character card activated: ${name}`);
+  return uniqueId;
+}
+
+function loadCardIntoCreator(card) {
+  const d = (card && card.card && card.card.data) ? card.card.data : ((card && card.spec === "chara_card_v2" && card.data) ? card.data : (card && card.data ? card.data : (card || {})));
+  const ext = d.extensions || {};
+  if ($("ccName")) $("ccName").value = d.name || "";
+  const av = d.avatar || ext.avatar || (card && card.avatar) || "";
+  if ($("ccAvatarUrl")) {
+    $("ccAvatarUrl").value = av;
+    if ($("ccAvatarPreview")) $("ccAvatarPreview").src = av || "";
+  }
+  if ($("ccCreator")) $("ccCreator").value = d.creator || "Online Import";
+  if ($("ccVersion")) $("ccVersion").value = d.character_version || "1.0";
+  if ($("ccTags")) $("ccTags").value = Array.isArray(d.tags) ? d.tags.join(", ") : (d.tags || "");
+  if ($("ccDescription")) $("ccDescription").value = d.description || "";
+  if ($("ccPersonality")) $("ccPersonality").value = d.personality || "";
+  if ($("ccScenario")) $("ccScenario").value = d.scenario || "";
+  if ($("ccFirstMes")) $("ccFirstMes").value = d.first_mes || d.greeting || "";
+  if ($("ccMesExample")) $("ccMesExample").value = d.mes_example || "";
+  if ($("ccAltGreetings")) $("ccAltGreetings").value = Array.isArray(d.alternate_greetings) ? d.alternate_greetings.join("\n") : "";
+  if ($("ccSystemPrompt")) $("ccSystemPrompt").value = d.system_prompt || "";
+  if ($("ccPostHistory")) $("ccPostHistory").value = d.post_history_instructions || "";
+}
+
+function initCardCreatorUI() {
+  // Creator tab navigation
+  document.querySelectorAll(".creator-tabs-bar button[data-cctab]").forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll(".creator-tabs-bar button[data-cctab]").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".cc-tabpage").forEach(page => page.style.display = "none");
+      btn.classList.add("active");
+      const target = $(btn.dataset.cctab);
+      if (target) target.style.display = "block";
+    };
+  });
+
+  // Avatar URL live update
+  if ($("ccAvatarUrl")) {
+    $("ccAvatarUrl").addEventListener("input", () => {
+      const url = $("ccAvatarUrl").value.trim();
+      if ($("ccAvatarPreview")) $("ccAvatarPreview").src = url || "";
+    });
+  }
+
+  // Reset form
+  if ($("btnCcReset")) {
+    $("btnCcReset").onclick = () => {
+      if (!confirm("Reset all Character Card form fields?")) return;
+      ["ccName", "ccAvatarUrl", "ccTags", "ccDescription", "ccPersonality", "ccScenario", "ccFirstMes", "ccMesExample", "ccAltGreetings", "ccSystemPrompt", "ccPostHistory"].forEach(id => {
+        if ($(id)) $(id).value = "";
+      });
+      if ($("ccAvatarPreview")) $("ccAvatarPreview").src = "";
+      if ($("ccStatusMsg")) $("ccStatusMsg").textContent = "";
+    };
+  }
+
+  // Quick AI Assist button
+  if ($("btnCcQuickAi")) {
+    $("btnCcQuickAi").onclick = () => {
+      closeModal("modalCardCreator");
+      openModal("modalAiCardGen");
+    };
+  }
+
+  // AI Avatar generation
+  if ($("btnCcGenAvatar")) {
+    $("btnCcGenAvatar").onclick = async () => {
+      const name = ($("ccName") && $("ccName").value.trim()) || "";
+      const desc = ($("ccDescription") && $("ccDescription").value.trim()) || "";
+      const tags = ($("ccTags") && $("ccTags").value.trim()) || "";
+      if (!name) {
+        alert("Please enter a character name first.");
+        return;
+      }
+      $("btnCcGenAvatar").disabled = true;
+      $("btnCcGenAvatar").innerHTML = `<i class="material-icons" style="font-size:0.75rem;">hourglass_empty</i> Painting…`;
+      const prompt = `portrait avatar of ${name}, ${desc ? desc.slice(0, 160) : 'anime character'}, ${tags}, highly detailed digital portrait, 8k, masterpiece`;
+      try {
+        const apiKey = ($("hapuppy_key") && $("hapuppy_key").value.trim()) || store.load("hapuppy_key", "");
+        const r = await fetch("/api/image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt, width: 512, height: 512, api_key: apiKey })
+        });
+        const j = await r.json();
+        if (j.error) throw new Error(j.error);
+
+        for (let i = 0; i < 30; i++) {
+          await new Promise(res => setTimeout(res, 3000));
+          const pr = await fetch("/api/image/" + j.job);
+          const pj = await pr.json();
+          if (pj.done && pj.img) {
+            if ($("ccAvatarUrl")) $("ccAvatarUrl").value = pj.img;
+            if ($("ccAvatarPreview")) $("ccAvatarPreview").src = pj.img;
+            if ($("ccStatusMsg")) $("ccStatusMsg").textContent = "Avatar generated ✓";
+            return;
+          }
+        }
+      } catch (err) {
+        alert("Avatar generation failed: " + err.message);
+      } finally {
+        $("btnCcGenAvatar").disabled = false;
+        $("btnCcGenAvatar").innerHTML = `<i class="material-icons" style="font-size:0.75rem;">image</i> AI Avatar`;
+      }
+    };
+  }
+
+  // Save & Chat
+  if ($("btnCcSaveChat")) {
+    $("btnCcSaveChat").onclick = () => {
+      const name = ($("ccName") && $("ccName").value.trim()) || "";
+      if (!name) {
+        alert("Please enter a Character Name.");
+        return;
+      }
+      const rawData = {
+        name: name,
+        avatar: $("ccAvatarUrl") ? $("ccAvatarUrl").value.trim() : "",
+        creator: $("ccCreator") ? $("ccCreator").value.trim() : "InfinityRoleplay Studio",
+        character_version: $("ccVersion") ? $("ccVersion").value.trim() : "1.0",
+        tags: $("ccTags") ? $("ccTags").value.split(",").map(s => s.trim()).filter(Boolean) : [],
+        description: $("ccDescription") ? $("ccDescription").value.trim() : "",
+        personality: $("ccPersonality") ? $("ccPersonality").value.trim() : "",
+        scenario: $("ccScenario") ? $("ccScenario").value.trim() : "",
+        first_mes: $("ccFirstMes") ? $("ccFirstMes").value.trim() : "",
+        mes_example: $("ccMesExample") ? $("ccMesExample").value.trim() : "",
+        alternate_greetings: $("ccAltGreetings") ? $("ccAltGreetings").value.split("\n").map(s => s.trim()).filter(Boolean) : [],
+        system_prompt: $("ccSystemPrompt") ? $("ccSystemPrompt").value.trim() : "",
+        post_history_instructions: $("ccPostHistory") ? $("ccPostHistory").value.trim() : ""
+      };
+      registerAndActivateCharacterCard(rawData);
+      closeModal("modalCardCreator");
+    };
+  }
+
+  // Export Card V2 JSON
+  if ($("btnCcExportJson")) {
+    $("btnCcExportJson").onclick = () => {
+      const name = ($("ccName") && $("ccName").value.trim()) || "Character";
+      const cardV2 = {
+        spec: "chara_card_v2",
+        spec_version: "2.0",
+        data: {
+          name: name,
+          description: $("ccDescription") ? $("ccDescription").value.trim() : "",
+          personality: $("ccPersonality") ? $("ccPersonality").value.trim() : "",
+          scenario: $("ccScenario") ? $("ccScenario").value.trim() : "",
+          first_mes: $("ccFirstMes") ? $("ccFirstMes").value.trim() : "",
+          mes_example: $("ccMesExample") ? $("ccMesExample").value.trim() : "",
+          creator_notes: "",
+          system_prompt: $("ccSystemPrompt") ? $("ccSystemPrompt").value.trim() : "",
+          post_history_instructions: $("ccPostHistory") ? $("ccPostHistory").value.trim() : "",
+          alternate_greetings: $("ccAltGreetings") ? $("ccAltGreetings").value.split("\n").map(s => s.trim()).filter(Boolean) : [],
+          tags: $("ccTags") ? $("ccTags").value.split(",").map(s => s.trim()).filter(Boolean) : [],
+          creator: $("ccCreator") ? $("ccCreator").value.trim() : "InfinityRoleplay Studio",
+          character_version: $("ccVersion") ? $("ccVersion").value.trim() : "1.0",
+          extensions: {
+            avatar: $("ccAvatarUrl") ? $("ccAvatarUrl").value.trim() : ""
+          }
+        }
+      };
+      const blob = new Blob([JSON.stringify(cardV2, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}_v2.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+  }
+}
+
+function initOnlineSearchUI() {
+  async function performSearch() {
+    const q = ($("onlineSearchInput") && $("onlineSearchInput").value.trim()) || "";
+    if (!q) return;
+    const loadEl = $("onlineSearchLoading");
+    const resEl = $("onlineSearchResults");
+    if (loadEl) loadEl.style.display = "block";
+    if (resEl) resEl.innerHTML = "";
+
+    try {
+      const r = await fetch("/api/character/search?q=" + encodeURIComponent(q));
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "Search failed");
+      const results = j.results || [];
+      if (results.length === 0) {
+        if (resEl) resEl.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:30px; color:var(--text-muted);">No online characters found for "${escHtml(q)}". Try another search query.</div>`;
+        return;
+      }
+      results.forEach(item => {
+        const d = item.data || item;
+        const cardDiv = document.createElement("div");
+        cardDiv.className = "card";
+        cardDiv.style.cssText = "background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px; display:flex; flex-direction:column; gap:8px;";
+
+        const topRow = document.createElement("div");
+        topRow.style.cssText = "display:flex; gap:12px; align-items:center;";
+
+        const img = document.createElement("img");
+        img.src = d.avatar || "";
+        img.alt = d.name;
+        img.style.cssText = "width:52px; height:52px; border-radius:50%; object-fit:cover; background:#222; border:1px solid var(--border); flex-shrink:0;";
+        img.onerror = () => { img.style.display = "none"; };
+
+        const titleBox = document.createElement("div");
+        titleBox.style.cssText = "flex:1; min-width:0;";
+        titleBox.innerHTML = `
+          <div style="font-weight:700; font-size:1rem; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escHtml(d.name)}</div>
+          <div style="font-size:0.75rem; color:var(--accent);">${escHtml(item.source || "Online Index")}</div>
+        `;
+
+        topRow.appendChild(img);
+        topRow.appendChild(titleBox);
+        cardDiv.appendChild(topRow);
+
+        const desc = document.createElement("div");
+        desc.style.cssText = "font-size:0.78rem; color:var(--text-muted); line-height:1.4; max-height:4.2em; overflow:hidden; text-overflow:ellipsis;";
+        desc.textContent = d.description || d.personality || "No description available.";
+        cardDiv.appendChild(desc);
+
+        const actions = document.createElement("div");
+        actions.style.cssText = "display:flex; gap:6px; margin-top:auto; padding-top:6px;";
+
+        const btnUse = document.createElement("button");
+        btnUse.className = "secondary tiny waves-effect";
+        btnUse.style.cssText = "flex:1; background:var(--accent); color:#fff; border-color:var(--accent);";
+        btnUse.innerHTML = `<i class="material-icons" style="font-size:0.85rem;">chat</i> Chat`;
+        btnUse.onclick = () => {
+          registerAndActivateCharacterCard(item);
+          closeModal("modalOnlineSearch");
+        };
+
+        const btnEdit = document.createElement("button");
+        btnEdit.className = "secondary tiny waves-effect";
+        btnEdit.style.cssText = "flex:1;";
+        btnEdit.innerHTML = `<i class="material-icons" style="font-size:0.85rem;">edit</i> Customize`;
+        btnEdit.onclick = () => {
+          loadCardIntoCreator(item);
+          closeModal("modalOnlineSearch");
+          openModal("modalCardCreator");
+        };
+
+        actions.appendChild(btnUse);
+        actions.appendChild(btnEdit);
+        cardDiv.appendChild(actions);
+
+        if (resEl) resEl.appendChild(cardDiv);
+      });
+    } catch (err) {
+      if (resEl) resEl.innerHTML = `<div style="grid-column:1/-1; color:var(--status-err); padding:20px;">Search error: ${escHtml(err.message)}</div>`;
+    } finally {
+      if (loadEl) loadEl.style.display = "none";
+    }
+  }
+
+  if ($("btnDoOnlineSearch")) $("btnDoOnlineSearch").onclick = performSearch;
+  if ($("onlineSearchInput")) {
+    $("onlineSearchInput").onkeydown = (e) => {
+      if (e.key === "Enter") performSearch();
+    };
+  }
+
+  // Direct URL Import
+  if ($("btnDoImportUrl")) {
+    $("btnDoImportUrl").onclick = async () => {
+      const url = ($("inputImportUrl") && $("inputImportUrl").value.trim()) || "";
+      const status = $("importUrlStatus");
+      if (!url) {
+        if (status) status.textContent = "Please enter a URL.";
+        return;
+      }
+      if (status) status.textContent = "Fetching JSON card…";
+      try {
+        const r = await fetch("/api/character/import-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url })
+        });
+        const j = await r.json();
+        if (!j.ok) throw new Error(j.error || "Failed to fetch card");
+        registerAndActivateCharacterCard(j.card);
+        closeModal("modalOnlineSearch");
+      } catch (e) {
+        if (status) status.textContent = "Import error: " + e.message;
+      }
+    };
+  }
+}
+
+function initAiCardGenUI() {
+  function syncAiGenModels() {
+    const sel = $("aiGenModel");
+    const mainSel = $("model");
+    if (!sel || !mainSel) return;
+    sel.innerHTML = mainSel.innerHTML;
+    sel.value = mainSel.value;
+  }
+
+  if ($("btnSubmitAiGen")) {
+    $("btnSubmitAiGen").onclick = async () => {
+      const prompt = ($("aiGenPrompt") && $("aiGenPrompt").value.trim()) || "";
+      const style = ($("aiGenStyle") && $("aiGenStyle").value) || "cinematic roleplay";
+      const model = ($("aiGenModel") && $("aiGenModel").value.trim()) || ($("model") && $("model").value.trim()) || "";
+      if (!prompt) {
+        alert("Please enter a character concept or prompt.");
+        return;
+      }
+      if (!model) {
+        alert("Please choose a model.");
+        return;
+      }
+
+      const loadEl = $("aiGenLoading");
+      const btn = $("btnSubmitAiGen");
+      if (loadEl) loadEl.style.display = "block";
+      btn.disabled = true;
+
+      try {
+        const r = await fetch("/api/character/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt, style, model })
+        });
+        const j = await r.json();
+        if (!j.ok) throw new Error(j.error || "Generation failed");
+        loadCardIntoCreator(j.card);
+        closeModal("modalAiCardGen");
+        openModal("modalCardCreator");
+        addMsg("sys", `✨ Character card generated for "${j.card.data?.name || 'Character'}". Review and customize below!`);
+      } catch (err) {
+        alert("Character generation error: " + err.message);
+      } finally {
+        if (loadEl) loadEl.style.display = "none";
+        btn.disabled = false;
+      }
+    };
+  }
+
+  // Hook sidebar toolbar buttons
+  if ($("btnOpenCardCreator")) {
+    $("btnOpenCardCreator").onclick = () => openModal("modalCardCreator");
+  }
+  if ($("btnOpenOnlineSearch")) {
+    $("btnOpenOnlineSearch").onclick = () => openModal("modalOnlineSearch");
+  }
+  if ($("btnOpenAiGen")) {
+    $("btnOpenAiGen").onclick = () => {
+      syncAiGenModels();
+      openModal("modalAiCardGen");
+    };
+  }
+}
+
+initCardCreatorUI();
+initOnlineSearchUI();
+initAiCardGenUI();
+
+populateVoices();
+syncCharacterVoice(currentCharKey);
+syncVariantNav();
+if (typeof M !== "undefined") {
+  try {
+    if (M.AutoInit) M.AutoInit();
+    if (M.Waves) M.Waves.init();
+  } catch (e) {}
+}
+</script>
+</body>
+</html>
