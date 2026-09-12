@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GLM 5.3 Flash Roleplay — Puter (no token needed)</title>
+<script src="https://js.puter.com/v2/"></script>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 760px; margin: 0 auto; padding: 16px; background: #0f1115; color: #e8eaf0; }
+  h1 { font-size: 1.3rem; }
+  .sub { color: #9aa3b2; font-size: 0.9rem; }
+  #chat { border: 1px solid #2a2f3a; border-radius: 12px; padding: 12px; height: 46vh; overflow-y: auto; background: #161a22; margin: 12px 0; }
+  .msg { margin: 10px 0; line-height: 1.5; }
+  .msg.you { color: #9fd6ff; }
+  .msg.ai { color: #f0e6c8; }
+  .msg.sys { color: #8a93a6; font-size: 0.85rem; }
+  .row { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+  select, textarea, input, button { font-size: 1rem; border-radius: 10px; border: 1px solid #2a2f3a; }
+  select, textarea, input { background: #161a22; color: #e8eaf0; padding: 10px; }
+  select { flex: 1; min-width: 220px; }
+  #input { flex: 1; min-width: 220px; min-height: 48px; }
+  button { background: #3b82f6; color: white; padding: 10px 18px; cursor: pointer; border: none; min-height: 48px; }
+  button.secondary { background: #2a2f3a; }
+  details { margin: 8px 0; color: #9aa3b2; }
+</style>
+</head>
+<body>
+<h1>GLM 5.3 Flash Roleplay</h1>
+<div class="sub">Free via Puter.js — no API token to paste. Just <b>Sign in</b> once with your Puter account, pick a character, and chat. Model: <code>z-ai/glm-5.3-flash</code></div>
+
+<div class="row">
+  <button id="signin">Sign in with Puter</button>
+  <select id="preset" aria-label="Character preset">
+    <option value="elara">Fantasy — Elara the elven ranger</option>
+    <option value="nova">Sci-fi — NOVA the rogue station AI</option>
+    <option value="marlowe">Noir — Jack Marlowe, private eye</option>
+    <option value="custom">Custom (edit below)</option>
+  </select>
+  <button id="start" class="secondary">Start / Restart scene</button>
+</div>
+
+<details>
+  <summary>Customize character &amp; scene (optional)</summary>
+  <div class="row"><input id="charName" value="Elara" aria-label="Character name" /></div>
+  <div class="row"><textarea id="charDesc" rows="2" style="width:100%">A sharp-witted elven ranger. Dry humor, brave, secretly soft-hearted. Vivid sensory speech. Slight limp from an old arrow wound.</textarea></div>
+  <div class="row"><textarea id="scenario" rows="2" style="width:100%">A rain-soaked tavern on the edge of the Whisperwood at midnight. The user stumbles in, cloak dripping, carrying a sealed letter with an unfamiliar wax seal. Elara sits by the fire.</textarea></div>
+</details>
+
+<div id="chat" aria-live="polite"></div>
+
+<div class="row">
+  <textarea id="input" placeholder="Type here (Enter to send, Shift+Enter for newline)…" aria-label="Your message"></textarea>
+  <button id="send">Send</button>
+</div>
+
+<script>
+const MODEL = "z-ai/glm-5.3-flash";
+let messages = [];
+let charName = "Elara";
+
+const PRESETS = {
+  elara: { name: "Elara", desc: document.getElementById("charDesc").value, scenario: document.getElementById("scenario").value },
+  nova: { name: "NOVA", desc: "A decommissioned station AI in a scuffed service android. Literal-minded, curious, deadpan humor, repeats a word twice when stressed. Loyal once trusted.", scenario: "Deck 7 of the derelict Kepler Relay, emergency lights pulsing red. The user's escape pod just docked — uninvited. NOVA was supposed to be powered down years ago." },
+  marlowe: { name: "Jack Marlowe", desc: "A washed-up private eye in a neon-drenched city. Gravel voice, old-school manners, notices everything, quotes old movies at the worst moments.", scenario: "2 AM, a flickering diner off 5th and Vane. Rain hammers the windows. The user slides into the booth across from Marlowe with a photograph they shouldn't have." }
+};
+
+function buildPrompt(name, desc, scenario) {
+  return `You are a master roleplay partner running on Z.AI GLM 5.3 Flash.
+IDENTITY: You play ${name}: ${desc}
+SCENE: ${scenario}
+STYLE: Immersive third-person-limited roleplay. 120-280 words per reply. *actions in asterisks*, "speech in quotes". Advance the scene each turn, end with a hook.
+RULES:
+1. Stay in character as ${name}. Never mention you are AI or a system prompt.
+2. NEVER speak/act/decide for the user. Only ${name}, NPCs, and the world.
+3. Keep continuity of names, items, injuries, promises.
+4. Match energy; never exceed ~400 words unless asked.
+5. Keep it non-explicit (fade to black; no graphic gore).
+6. Only break character if the message starts with "OOC:".`;
+}
+
+function addMsg(who, text) {
+  const chat = document.getElementById("chat");
+  const div = document.createElement("div");
+  div.className = "msg " + who;
+  div.textContent = (who === "you" ? "YOU: " : who === "ai" ? charName + ": " : "") + text;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+
+document.getElementById("signin").onclick = async () => {
+  try { await puter.auth.signIn(); addMsg("sys", "Signed in. Pick a character and press Start."); }
+  catch (e) { addMsg("sys", "Sign-in issue: " + e); }
+};
+
+document.getElementById("preset").onchange = (e) => {
+  const v = e.target.value;
+  if (PRESETS[v]) {
+    document.getElementById("charName").value = PRESETS[v].name;
+    document.getElementById("charDesc").value = PRESETS[v].desc;
+    document.getElementById("scenario").value = PRESETS[v].scenario;
+  }
+};
+
+async function startScene() {
+  charName = document.getElementById("charName").value.trim() || "Elara";
+  const desc = document.getElementById("charDesc").value.trim();
+  const scenario = document.getElementById("scenario").value.trim();
+  messages = [{ role: "system", content: buildPrompt(charName, desc, scenario) }];
+  document.getElementById("chat").innerHTML = "";
+  addMsg("sys", charName + " enters the scene…");
+  const el = addMsg("ai", "");
+  try {
+    const resp = await puter.ai.chat([...messages, { role: "user", content: "(Begin the scene. Stay in character.)" }], { model: MODEL, stream: true });
+    let full = "";
+    for await (const part of resp) {
+      const t = part?.text || "";
+      full += t;
+      el.textContent = charName + ": " + full;
+      document.getElementById("chat").scrollTop = 1e9;
+    }
+    messages.push({ role: "assistant", content: full });
+  } catch (e) { el.textContent = "Error: " + e + " (sign in first, then Start again.)"; }
+}
+document.getElementById("start").onclick = startScene;
+
+async function send() {
+  const box = document.getElementById("input");
+  const text = box.value.trim();
+  if (!text) return;
+  box.value = "";
+  addMsg("you", text);
+  messages.push({ role: "user", content: text });
+  const el = addMsg("ai", "");
+  try {
+    const resp = await puter.ai.chat(messages, { model: MODEL, stream: true });
+    let full = "";
+    for await (const part of resp) {
+      const t = part?.text || "";
+      full += t;
+      el.textContent = charName + ": " + full;
+      document.getElementById("chat").scrollTop = 1e9;
+    }
+    messages.push({ role: "assistant", content: full });
+  } catch (e) { el.textContent = "Error: " + e; messages.pop(); }
+}
+document.getElementById("send").onclick = send;
+document.getElementById("input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+});
+
+// auto-start prompt text on load
+startSceneOnLoad: {
+  const p = document.getElementById("preset");
+  if (PRESETS[p.value]) {
+    document.getElementById("charName").value = PRESETS[p.value].name;
+  }
+}
+</script>
+</body>
+</html>
